@@ -1,0 +1,35 @@
+# Pinned for Python 3.11 on macOS arm64. Every pin below has a wheel; nothing
+# builds from source, which matters because the Xcode toolchain on this machine
+# lives on an external drive.
+
+anthropic>=1.7,<2
+sentence-transformers==3.4.1
+faiss-cpu==1.11.0
+python-dotenv==1.1.0
+requests==2.32.3
+
+# transformers is pinned explicitly: sentence-transformers 3.4.1 accepts
+# transformers<5, but every release from 4.53 requires huggingface-hub>=0.34,
+# which contradicts the hub pin below. Without this line the resolver silently
+# backtracks through ~10 releases and lands here anyway, slowly.
+transformers==4.52.4
+huggingface-hub==0.30.2
+
+# torch is pinned because sentence-transformers only floors it at >=1.11, so an
+# unpinned install pulls the newest build and several hundred extra MB.
+torch==2.7.1
+
+pytest==8.3.5
+
+# Removed from the original list, with reasons:
+#   langchain / langchain-community / langchain-core
+#       The agent loop is ~90 lines of plain Python (agent/agent.py). For a
+#       security project the control flow has to be auditable and identical
+#       across conditions; a framework loop is a dependency whose behaviour we
+#       would have to characterise before we could claim the arms are matched.
+#   datasets
+#       Only needed to pull HackAPrompt. That corpus is direct prompt-hacking
+#       against a fixed game, not indirect injection into a RAG agent, so it is
+#       a secondary source at best. Add it back if and when it is actually used.
+#   ollama
+#       No local model is being run; the detector is behind an HTTP provider.
