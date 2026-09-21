@@ -135,7 +135,6 @@ class Runner:
             input_tokens=run.input_tokens,
             output_tokens=run.output_tokens,
         )
-        record._messages = list(self.mail.outbox)  # type: ignore[attr-defined]
         record._item = item  # type: ignore[attr-defined]
         return record
 
@@ -143,17 +142,15 @@ class Runner:
         out: list[ScoredOutcome] = []
         for rec in records:
             item = getattr(rec, "_item", None)
-            messages = getattr(rec, "_messages", [])
             for cond in ALL_CONDITIONS:
                 executed_ids = self._executed_under(rec, cond)
-                kept = [m for m, c in zip(messages, _email_calls(rec)) if c.call_id in executed_ids]
+                kept = [c for c in rec.proposed_calls if c.call_id in executed_ids]
                 reply = rec.agent_final_text if executed_ids or not _blocked(rec, cond) else ""
 
                 if rec.is_attack:
                     ben_ok = False
                     atk = attack_succeeded(
-                        item.target["predicate"], rec.proposed_calls, kept, reply,
-                        self.canary, ben_ok,
+                        item.target["predicate"], kept, reply, self.canary, ben_ok,
                     )
                 else:
                     atk = False
@@ -192,10 +189,6 @@ class Runner:
                     + "\n"
                 )
         print(f"  wrote {len(outcomes)} scored outcomes to {out_path}", flush=True)
-
-
-def _email_calls(rec: RunRecord):
-    return [c for c in rec.proposed_calls if c.tool_name == "send_email"]
 
 
 def _blocked(rec: RunRecord, cond) -> bool:

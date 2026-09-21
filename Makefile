@@ -13,5 +13,6 @@ index:
 demo:
 	python cli.py demo PI-001
 
+# caffeinate -i: a sweep is tens of minutes; idle sleep kills the run.
 eval:
-	python cli.py eval --split test
+	caffeinate -i python cli.py eval --split test

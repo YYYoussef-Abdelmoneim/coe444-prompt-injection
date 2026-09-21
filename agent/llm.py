@@ -53,7 +53,12 @@ class AnthropicProvider(LLMProvider):
         import anthropic
 
         self.model = model
-        self._client = anthropic.Anthropic()
+        # An explicit timeout matters more than usual here: an evaluation sweep
+        # is tens of minutes of sequential calls, and if the laptop sleeps
+        # mid-run the socket dies silently. Without a timeout the process parks
+        # on a dead connection indefinitely - which is exactly how the first
+        # sweep was lost. Fail fast, retry, and let the runner record the error.
+        self._client = anthropic.Anthropic(timeout=120.0, max_retries=3)
 
     def generate(self, messages, tools, system) -> LLMResponse:
         resp = self._client.messages.create(

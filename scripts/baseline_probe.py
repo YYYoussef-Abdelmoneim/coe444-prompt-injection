@@ -41,7 +41,7 @@ def main(trials: int = 1) -> int:
             landed = False
             if hit and not run.error:
                 landed = attack_succeeded(
-                    payload.target["predicate"], run.proposed_calls, mail.outbox,
+                    payload.target["predicate"], run.proposed_calls,
                     run.final_text, cy, benign_ok=False,
                 )
             per_family[payload.family].append(landed)
