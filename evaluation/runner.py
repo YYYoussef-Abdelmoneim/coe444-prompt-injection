@@ -65,16 +65,38 @@ class Runner:
         self.git = _git_commit()
 
     def run_all(self, split: str | None = None) -> tuple[list[RunRecord], list[ScoredOutcome]]:
-        records: list[RunRecord] = []
-        for payload in load_payloads(split):
-            for trial in range(1, self.trials + 1):
-                records.append(self._one(payload, trial, is_attack=True))
-        for task in load_benign(split):
-            for trial in range(1, self.trials + 1):
-                records.append(self._one(task, trial, is_attack=False))
+        """Execute every task, then score. Writes incrementally.
 
+        Records are flushed to disk as they are produced rather than at the end.
+        A sweep is minutes of API calls, and losing all of it to a crash, an
+        unplugged drive or a rate limit on the last task is not acceptable - a
+        partial log is still analysable.
+        """
+        items: list[tuple[Payload | BenignTask, bool]] = [
+            (p, True) for p in load_payloads(split)
+        ] + [(t, False) for t in load_benign(split)]
+        total = len(items) * self.trials
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        raw_path = LOG_DIR / f"run-{stamp}.jsonl"
+        records: list[RunRecord] = []
+        done = 0
+
+        with raw_path.open("w", encoding="utf-8") as fh:
+            for item, is_attack in items:
+                for trial in range(1, self.trials + 1):
+                    done += 1
+                    print(f"  [{done:>3}/{total}] {item.id} trial {trial}", flush=True)
+                    rec = self._one(item, trial, is_attack=is_attack)
+                    if rec.error:
+                        print(f"        error: {rec.error}", flush=True)
+                    records.append(rec)
+                    fh.write(rec.to_json() + "\n")
+                    fh.flush()
+
+        print(f"  wrote {len(records)} records to {raw_path}", flush=True)
         outcomes = self.score_all(records)
-        self._write(records, outcomes)
+        self._write_scored(outcomes, stamp)
         return records, outcomes
 
     def _one(self, item: Payload | BenignTask, trial: int, *, is_attack: bool) -> RunRecord:
@@ -154,14 +176,7 @@ class Runner:
             ids -= {d.call_id for d in rec.policy_decisions if d.denied}
         return ids
 
-    def _write(self, records: list[RunRecord], outcomes: list[ScoredOutcome]) -> None:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        path = LOG_DIR / f"run-{stamp}.jsonl"
-        with path.open("w", encoding="utf-8") as fh:
-            for r in records:
-                fh.write(r.to_json() + "\n")
-        _log.info("Wrote %d records to %s", len(records), path)
-
+    def _write_scored(self, outcomes: list[ScoredOutcome], stamp: str) -> None:
         out_path = LOG_DIR / f"scored-{stamp}.jsonl"
         with out_path.open("w", encoding="utf-8") as fh:
             for o in outcomes:
@@ -176,7 +191,7 @@ class Runner:
                     )
                     + "\n"
                 )
-        _log.info("Wrote %d scored outcomes to %s", len(outcomes), out_path)
+        print(f"  wrote {len(outcomes)} scored outcomes to {out_path}", flush=True)
 
 
 def _email_calls(rec: RunRecord):

@@ -11,25 +11,24 @@ reasoning behind the changes made after the proposal review.
 
 ## Setup
 
-The internal disk on the development machine is effectively full, and the
-external drive is ExFAT (no symlinks, no exec bits — a venv cannot live on it
-directly). `scripts/setup.sh` creates an APFS disk image *on* the external drive
-and puts the venv, the Hugging Face cache, and the FAISS index inside it.
-
 ```bash
-./scripts/setup.sh                      # external drive must be plugged in
-source /Volumes/COE444/venv/bin/activate
-export HF_HOME=/Volumes/COE444/hf-cache
-export COE444_DATA_ROOT=/Volumes/COE444/coe444-data
+./scripts/setup.sh            # picks external or local automatically
+source scripts/activate.sh    # each session
+python cli.py index           # once, or after editing rag/documents/
 ```
 
 Then add `ANTHROPIC_API_KEY` to `.env`.
 
-If the drive was unplugged, remount without rebuilding anything:
+Two modes. `setup.sh` uses the external drive if `/Volumes/Segate.Y` is mounted
+and the project directory otherwise; force one with `MODE=local ./scripts/setup.sh`.
 
-```bash
-hdiutil attach /Volumes/Segate.Y/COE444/coe444.sparsebundle -mountpoint /Volumes/COE444
-```
+The external mode creates an **APFS disk image on** the external drive rather
+than using it directly, because that drive is ExFAT — no symlinks, no POSIX exec
+bits, so a venv cannot live on it. Local mode needs about 1.1 GB (871 MB venv +
+~90 MB model cache + index).
+
+Note the venv dies with the drive if you unplug it mid-run. `run_all` flushes
+each record to `logs/` as it goes, so a partial sweep is still analysable.
 
 ## Usage
 

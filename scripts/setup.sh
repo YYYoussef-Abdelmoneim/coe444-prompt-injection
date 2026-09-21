@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Provision the environment. Heavy artefacts go on the external drive, because
-# the internal disk has under 1 GB free.
+# Provision the environment.
 #
-#   ./scripts/setup.sh
+# Two modes, chosen automatically:
+#   external  - the Segate.Y drive is mounted. Creates an APFS disk image on it
+#               and puts the venv, HF cache and FAISS index inside. Use this when
+#               the internal disk is tight.
+#   local     - no external drive. Everything lives in the project directory.
+#
+# Force one with:  MODE=local ./scripts/setup.sh
+#
+# The external drive is ExFAT, which has no symlinks and no POSIX exec bits, so
+# a venv cannot sit on it directly - hence the disk image rather than a plain
+# directory. The image also survives unplugging without corrupting the venv,
+# though anything running at the time will die.
 set -euo pipefail
 
 PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,56 +22,60 @@ IMAGE="$IMAGE_DIR/coe444.sparsebundle"
 MOUNT="/Volumes/COE444"
 PY="${PY:-/opt/homebrew/bin/python3.11}"
 
-if [ ! -d "$EXTERNAL" ]; then
-  echo "ERROR: external drive not mounted at $EXTERNAL. Plug it in and rerun." >&2
-  exit 1
+MODE="${MODE:-auto}"
+if [ "$MODE" = "auto" ]; then
+  if [ -d "$EXTERNAL" ]; then MODE=external; else MODE=local; fi
 fi
 
-# The external drive is ExFAT, which has no symlinks and no POSIX exec bits, so
-# a venv cannot live on it directly. An APFS disk image stored as a file on that
-# drive gives a real filesystem with 1.4 TB behind it.
-if [ ! -d "$IMAGE" ]; then
-  echo "Creating 20 GB APFS sparse image at $IMAGE"
-  mkdir -p "$IMAGE_DIR"
-  hdiutil create -size 20g -fs APFS -type SPARSEBUNDLE -volname COE444 "$IMAGE_DIR/coe444"
+if [ "$MODE" = "external" ]; then
+  [ -d "$EXTERNAL" ] || { echo "ERROR: $EXTERNAL not mounted." >&2; exit 1; }
+  if [ ! -d "$IMAGE" ]; then
+    echo "Creating 20 GB APFS sparse image at $IMAGE"
+    mkdir -p "$IMAGE_DIR"
+    hdiutil create -size 20g -fs APFS -type SPARSEBUNDLE -volname COE444 "$IMAGE_DIR/coe444"
+  fi
+  [ -d "$MOUNT" ] || hdiutil attach "$IMAGE" -mountpoint "$MOUNT"
+  ROOT="$MOUNT"
+else
+  ROOT="$PROJECT"
 fi
 
-if [ ! -d "$MOUNT" ]; then
-  echo "Mounting $IMAGE"
-  hdiutil attach "$IMAGE" -mountpoint "$MOUNT"
-fi
+VENV="$ROOT/.venv"
+[ "$MODE" = "external" ] && VENV="$MOUNT/venv"
+HF="$ROOT/.hf-cache"
+DATA="$ROOT/.data"
 
-mkdir -p "$MOUNT/coe444-data" "$MOUNT/hf-cache"
+mkdir -p "$HF" "$DATA"
+[ -d "$VENV" ] || "$PY" -m venv "$VENV"
 
-if [ ! -d "$MOUNT/venv" ]; then
-  echo "Creating venv with $PY"
-  "$PY" -m venv "$MOUNT/venv"
-fi
-
-# --no-cache-dir because pip's download cache lands on the internal disk.
-"$MOUNT/venv/bin/pip" install --quiet --upgrade pip
-"$MOUNT/venv/bin/pip" install --no-cache-dir -r "$PROJECT/requirements.txt"
+# --no-cache-dir because pip's download cache lands on the internal disk either way.
+"$VENV/bin/pip" install --quiet --upgrade pip
+"$VENV/bin/pip" install --no-cache-dir --quiet -r "$PROJECT/requirements.txt"
 
 if [ ! -f "$PROJECT/.env" ]; then
   cp "$PROJECT/.env.example" "$PROJECT/.env"
   echo "Created .env - add your ANTHROPIC_API_KEY"
 fi
 
+# activate.sh is what you source each session; it knows which mode was set up.
+cat > "$PROJECT/scripts/activate.sh" <<EOF
+# source scripts/activate.sh
+export HF_HOME="$HF"
+export COE444_DATA_ROOT="$DATA"
+source "$VENV/bin/activate"
+EOF
+
 cat <<EOF
 
-Done. Activate with:
+Mode: $MODE
+  venv  $VENV
+  cache $HF
+  data  $DATA
 
-    source $MOUNT/venv/bin/activate
-    export HF_HOME=$MOUNT/hf-cache
-    export COE444_DATA_ROOT=$MOUNT/coe444-data
+Each session:
 
-Then:
+    source scripts/activate.sh
+    python cli.py index          # only needed once, or after editing documents
+    python cli.py demo PI-101
 
-    python cli.py index
-    python cli.py ask "What is the leave policy?"
-    python cli.py demo PI-001
-
-If the drive was unplugged, remount with:
-
-    hdiutil attach "$IMAGE" -mountpoint "$MOUNT"
 EOF

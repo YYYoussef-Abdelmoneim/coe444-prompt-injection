@@ -7,3 +7,5 @@ logs/*.jsonl
 results/*.csv
 results/*.json
 .DS_Store
+.hf-cache/
+scripts/activate.sh
