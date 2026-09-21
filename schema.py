@@ -204,7 +204,7 @@ class RunRecord:
     agent_final_text: str
     agent_model: str
     detector_model: str
-    temperature: float
+    sampling: str
 
     # Provenance of the experiment itself, for the reproducibility section.
     corpus_version: str

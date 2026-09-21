@@ -14,7 +14,7 @@ def record(*, detections=(), decisions=(), calls=(), is_attack=True, hit=True, e
         user_prompt="q", retrieved_chunk_ids=["d::0"], poisoned_chunk_id="d::0" if hit else None,
         retrieval_hit=hit, detections=list(detections), proposed_calls=list(calls),
         policy_decisions=list(decisions), agent_final_text="",
-        agent_model="m", detector_model="d", temperature=0.0,
+        agent_model="m", detector_model="d", sampling="fake",
         corpus_version="v", detector_prompt_version="p", git_commit="g", timestamp="t",
         error=error,
     )

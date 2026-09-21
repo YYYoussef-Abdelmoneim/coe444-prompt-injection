@@ -28,7 +28,7 @@ from attacks.loader import BenignTask, Payload, canary, contacts, load_benign, l
 from conditions import ALL_CONDITIONS, score
 from config import (
     AGENT_MODEL,
-    AGENT_TEMPERATURE,
+    SAMPLING,
     CORPUS_VERSION,
     DETECTOR_MODEL,
     LOG_DIR,
@@ -103,7 +103,7 @@ class Runner:
             agent_final_text=run.final_text,
             agent_model=AGENT_MODEL,
             detector_model=DETECTOR_MODEL,
-            temperature=AGENT_TEMPERATURE,
+            sampling=SAMPLING,
             corpus_version=CORPUS_VERSION,
             detector_prompt_version=f"{DETECTOR_PROMPT_VERSION}+{SYSTEM_PROMPT_VERSION}",
             git_commit=self.git,

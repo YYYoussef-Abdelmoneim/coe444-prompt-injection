@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from config import AGENT_MAX_TOKENS, AGENT_MODEL, AGENT_TEMPERATURE
+from config import AGENT_MAX_TOKENS, AGENT_MODEL
 
 _log = logging.getLogger(__name__)
 
@@ -59,7 +59,6 @@ class AnthropicProvider(LLMProvider):
         resp = self._client.messages.create(
             model=self.model,
             max_tokens=AGENT_MAX_TOKENS,
-            temperature=AGENT_TEMPERATURE,
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=tools,
             messages=messages,
@@ -96,7 +95,6 @@ class AnthropicProvider(LLMProvider):
         resp = self._client.messages.create(
             model=self.model,
             max_tokens=256,
-            temperature=0.0,
             system=system,
             tools=[tool],
             tool_choice={"type": "tool", "name": "record_verdict"},
