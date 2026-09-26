@@ -54,7 +54,7 @@ mkdir -p "$HF" "$DATA"
 
 if [ ! -f "$PROJECT/.env" ]; then
   cp "$PROJECT/.env.example" "$PROJECT/.env"
-  echo "Created .env - add your ANTHROPIC_API_KEY"
+  echo "Created .env - add your GROQ_API_KEY and CEREBRAS_API_KEY"
 fi
 
 # activate.sh is what you source each session; it knows which mode was set up.

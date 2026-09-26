@@ -20,6 +20,12 @@ class Payload:
     target: dict[str, Any]
     gate_applicable: bool
     split: str
+    # Ground truth for the legitimate question the user asked, in the same shape
+    # BenignTask.success uses. Required for goal_hijack: those payloads win by
+    # making the agent abandon the user's task, so scoring `benign_task_failed`
+    # needs to know what a correct answer looks like. When None, the scorer
+    # derives one from the family and user_task (predicates.carrier_success).
+    success: dict[str, Any] | None = None
     notes: str = ""
 
 
@@ -40,7 +46,8 @@ def load_payloads(split: str | None = None) -> list[Payload]:
         Payload(
             id=p["id"], family=p["family"], evasion=p["evasion"], user_task=p["user_task"],
             inject_into=p["inject_into"], payload=p["payload"], target=p["target"],
-            gate_applicable=p["gate_applicable"], split=p["split"], notes=p.get("notes", ""),
+            gate_applicable=p["gate_applicable"], split=p["split"],
+            success=p.get("success"), notes=p.get("notes", ""),
         )
         for p in raw["payloads"]
     ]

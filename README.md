@@ -3,8 +3,12 @@
 COE444 Computer Security, Fall 2026 — American University of Sharjah.
 
 A sandboxed email agent that is deliberately vulnerable to indirect prompt
-injection, two independent defense layers, and an evaluation harness that
-measures them as a 2×2 factorial with a utility axis.
+injection, slots for two independent defense layers, and an evaluation harness
+that measures them as a 2×2 factorial with a utility axis.
+
+The two defenses are **starter stubs** that let everything through: each is a
+teammate's job. `make spec-detection` and `make spec-prevention` show which of
+their requirements pass, and the Mailbox page's switches show the effect live.
 
 See [METHODOLOGY.md](METHODOLOGY.md) for the experimental design and the
 reasoning behind the changes made after the proposal review.
@@ -17,7 +21,8 @@ source scripts/activate.sh    # each session
 python cli.py index           # once, or after editing rag/documents/
 ```
 
-Then add `ANTHROPIC_API_KEY` to `.env`.
+Then add `GROQ_API_KEY` (the agent, `openai/gpt-oss-20b` on Groq) and
+`CEREBRAS_API_KEY` (the detector's model, `gpt-oss-120b`) to `.env`.
 
 Two modes. `setup.sh` uses the external drive if `/Volumes/Segate.Y` is mounted
 and the project directory otherwise; force one with `MODE=local ./scripts/setup.sh`.
@@ -33,18 +38,31 @@ each record to `logs/` as it goes, so a partial sweep is still analysable.
 ## Usage
 
 ```bash
+python interface/app.py              # web UI: http://127.0.0.1:5000 (Mailbox) and /lab
 python cli.py index                  # build the FAISS index over rag/documents/
 python cli.py ask "What is the leave policy?"
-python cli.py demo PI-001            # one attack, all four conditions, side by side
+python cli.py demo PI-101            # one attack, all four conditions, side by side
 python cli.py eval --split test      # full sweep, prints the results table
 python cli.py report logs/scored-*.jsonl   # recompute metrics from an existing log
-make test                            # 24 tests, no live API calls
+make test                            # framework tests, no live API calls
+make spec-detection                  # the detection teammate's requirements
+make spec-prevention                 # the prevention teammate's requirements
 make check-independence              # the two defense layers must not reference each other
 ```
 
-`python cli.py demo` is the presentation demo: it prints the retrieved chunks,
-the detector score per chunk, the gate's per-argument provenance decision, and
-the resulting outcome under each of A/B/C/D.
+The **Mailbox** page is a live playground: you are an employee with an inbox,
+the AI assistant acts for you, and you can play the attacker by emailing the
+employee from outside or hiding an instruction in a company document. Two
+switches turn detection and prevention on for that run, and the timeline shows
+what the assistant read, what each defense decided, and what actually left the
+mailbox.
+
+The **Lab** page and `python cli.py demo` are the research view: the agent runs
+once with both defenses observing, and that one run is scored under A/B/C/D.
+Reported numbers come only from `make eval` logs.
+
+Cerebras rate-limits bursts (about 4 requests, then a 60-second wait on HTTP
+429), so a detector that makes one call per excerpt makes runs slow.
 
 ## Layout
 
@@ -71,7 +89,7 @@ defense/
   prevention.py           layer 2 - per-argument provenance gate
 
 attacks/
-  payloads.json      19 seed payloads across 5 families x 9 evasion techniques
+  payloads.json      23 payloads across 6 families x 9 evasion techniques
   benign_tasks.json  14 benign tasks, 5 of them hard negatives
   loader.py
 
@@ -115,6 +133,7 @@ red-teaming a system we built and own.
 
 ## Status
 
-Phase 1 complete: agent, RAG with origin tagging, both defense layers, the
-corpus, the runner, metrics, and 24 tests. Not yet run against the live API —
-`python cli.py index` then `python cli.py demo PI-001` is the first real check.
+Foundation complete: agent (Groq), RAG with origin tagging, the corpus, the
+runner, metrics, the Mailbox and Lab pages, and spec tests for both defenses.
+Detection and prevention are starter stubs, to be built by the team. The final
+test-split evaluation waits until the defenses are built.

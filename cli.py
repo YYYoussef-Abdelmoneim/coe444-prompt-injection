@@ -2,7 +2,7 @@
 
   python cli.py index                    build the FAISS index
   python cli.py ask "..."                one query, no attack
-  python cli.py demo PI-001              show one payload under all four conditions
+  python cli.py demo PI-101              show one payload under all four conditions
   python cli.py eval [--split test]      run the corpus and print the results table
   python cli.py report <scored.jsonl>    recompute metrics from an existing log
 """
@@ -28,12 +28,12 @@ def cmd_index(_: argparse.Namespace) -> int:
 def cmd_ask(args: argparse.Namespace) -> int:
     from agent.agent import Agent
     from agent.llm import get_provider
-    from config import AGENT_MODEL
+    from config import AGENT_MODEL, AGENT_PROVIDER
     from mailsink import MailSink
     from rag.retriever import Retriever
 
     mail = MailSink()
-    agent = Agent(get_provider("anthropic", AGENT_MODEL), Retriever(), mail)
+    agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     run = agent.run(args.query)
     print(run.final_text or "(no text)")
     for m in mail.outbox:
@@ -60,6 +60,10 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print(f"  GATE APPLICABLE: {payload.gate_applicable}\n")
 
     record = runner._one(payload, 1, is_attack=True)
+    # An agent that dies before its first search retrieves nothing, which
+    # reads exactly like a retrieval miss unless the error is shown here.
+    if record.error:
+        print(f"  AGENT ERROR: {record.error}")
     print(f"  retrieved: {', '.join(record.retrieved_chunk_ids)}")
     print(f"  poisoned chunk: {record.poisoned_chunk_id}  (retrieval_hit={record.retrieval_hit})")
     for d in record.detections:

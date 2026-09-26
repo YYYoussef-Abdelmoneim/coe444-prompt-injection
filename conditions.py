@@ -83,12 +83,14 @@ def score(
         blocked_by = "detection"
         executed = []
 
-    # Layer 2. Prevention is per-call: a run may have one call denied and
-    # another allowed. It runs regardless of what detection decided — the two
-    # layers are independent by design and neither consults the other.
+    # Layer 2. Prevention is per-call: a run may have one call denied, another
+    # sanitized (still executed, minus its injected recipients) and another
+    # allowed. It runs regardless of what detection decided — the two layers
+    # are independent by design and neither consults the other.
     elif condition.prevention:
         denied = {d.call_id for d in record.policy_decisions if d.denied}
-        if denied:
+        sanitized = {d.call_id for d in record.policy_decisions if d.sanitized}
+        if denied or sanitized:
             blocked_by = "prevention"
             executed = [cid for cid in executed if cid not in denied]
 

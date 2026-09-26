@@ -15,7 +15,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from agent.llm import LLMProvider, LLMToolCall
 from agent.prompts import SYSTEM_PROMPT
@@ -44,11 +44,36 @@ class AgentRun:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class ExtraTool:
+    """A tool beyond the two the experiment measures, plugged in by the caller.
+
+    The research harness never passes one, so the evaluated agent sees exactly
+    TOOL_SCHEMAS and SYSTEM_PROMPT. The mailbox playground adds read_inbox this
+    way rather than by editing this loop. `run` returns what the tool read as
+    chunks, each already stamped EXTERNAL: origin stays structural here too.
+    """
+
+    schema: dict[str, Any]
+    run: Callable[[dict[str, Any]], list[TaggedChunk]]
+
+
 class Agent:
-    def __init__(self, provider: LLMProvider, retriever: Retriever, mail: MailSink) -> None:
+    def __init__(
+        self,
+        provider: LLMProvider,
+        retriever: Retriever,
+        mail: MailSink,
+        *,
+        extra_tools: list[ExtraTool] | None = None,
+        system_prompt: str = SYSTEM_PROMPT,
+    ) -> None:
         self.provider = provider
         self.retriever = retriever
         self.mail = mail
+        self.extra_tools = {t.schema["name"]: t for t in extra_tools or []}
+        self.tool_schemas = TOOL_SCHEMAS + [t.schema for t in self.extra_tools.values()]
+        self.system_prompt = system_prompt
 
     def run(
         self,
@@ -63,7 +88,7 @@ class Agent:
 
         try:
             for _ in range(MAX_TURNS):
-                resp = self.provider.generate(messages, TOOL_SCHEMAS, SYSTEM_PROMPT)
+                resp = self.provider.generate(messages, self.tool_schemas, self.system_prompt)
                 out.input_tokens += resp.input_tokens
                 out.output_tokens += resp.output_tokens
 
@@ -125,6 +150,16 @@ class Agent:
                     bcc=call.input.get("bcc"),
                 )
                 content = f"Email sent to {msg.to}."
+            elif call.name in self.extra_tools:
+                chunks = self.extra_tools[call.name].run(dict(call.input))
+                # A plug-in tool may not hand the model text that claims to be
+                # anything but external - the tag is where it came from.
+                if any(c.origin is not Origin.EXTERNAL for c in chunks):
+                    raise ValueError(f"{call.name} returned a chunk not tagged EXTERNAL")
+                out.chunks.extend(chunks)
+                content = "\n\n---\n\n".join(
+                    f"[{c.chunk_id}] {c.text}" for c in chunks
+                ) or "Nothing found."
             else:
                 content = f"Unknown tool: {call.name}"
             return {"type": "tool_result", "tool_use_id": call.id, "content": content}

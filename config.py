@@ -16,34 +16,62 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).parent
 
+# ── Providers ─────────────────────────────────────────────────────────────────
+# Agent and detector each pick a provider, all speaking the OpenAI-compatible
+# chat-completions API (agent/llm.py:OpenAICompatProvider). The split setup
+# runs the agent on Groq and the detector on Cerebras; each provider's key is
+# only ever sent to its own base URL.
+CEREBRAS_BASE_URL: str = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
+CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")
+GROQ_BASE_URL: str = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+
+AGENT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "cerebras")
+DETECTOR_PROVIDER: str = os.getenv("DETECTOR_PROVIDER", "cerebras")
+
+# ANTHROPIC_API_KEY is deliberately NOT read here and is not required. The
+# Anthropic provider is retained so the Claude arm can be reproduced
+# (AGENT_PROVIDER=anthropic AGENT_MODEL=claude-haiku-4-5), and it builds its
+# client lazily, so nothing breaks when the key is absent.
+
 # ── Models ────────────────────────────────────────────────────────────────────
-# The proposal slide says Llama 3.1-8B. That model needs ~5 GB of disk and ~6 GB
-# of RAM; this laptop has neither, so the detector runs on a hosted model behind
-# the DetectorProvider ABC. Swapping back to Llama is one env var once a Groq or
-# HF token exists — see defense/detection.py.
+# Hosted rather than local: even an 8B model needs ~5 GB of disk and ~6 GB of
+# RAM this laptop does not have.
 #
 # Agent and detector are deliberately different models. If the thing policing
 # the agent shares the agent's failure modes, a prompt that fools one tends to
-# fool the other, and the detector's measured recall is optimistic.
-# Measured 2026-09-21 on the v0.2 corpus: baseline ASR is 39% with Haiku as the
-# agent and 13% with Sonnet, because Sonnet refuses every family except
-# goal_hijack. A 13% baseline leaves nothing for a defense to reduce, so the
-# victim agent is the cheaper tier and Sonnet is reported as a robustness arm.
-# This is a deliberate, stated choice, not a convenience: many real deployments
-# run exactly this tier for a high-volume assistant.
-AGENT_MODEL: str = os.getenv("AGENT_MODEL", "claude-haiku-4-5")
-# The detector is the stronger model so it does not share the agent's failure
-# modes. A guard that fails wherever the thing it guards fails reports
-# optimistic recall.
-DETECTOR_MODEL: str = os.getenv("DETECTOR_MODEL", "claude-sonnet-5")
-DETECTOR_PROVIDER: str = os.getenv("DETECTOR_PROVIDER", "anthropic")
+# fool the other, and the detector's measured recall is optimistic. Qwen and
+# gpt-oss come from different vendors, which restores the cross-vendor
+# separation the Llama 8B/70B pairing had lost. Those two Llama IDs were
+# retired by Cerebras in 2026 and now 404.
+#
+# NOTE: every ASR figure in METHODOLOGY.md sections 6.1, 6.3 and 6.4 was
+# measured on claude-haiku-4-5 (39% baseline) and claude-sonnet-5 (13%). Those
+# numbers do not carry over to the Cerebras models and must be re-measured
+# before they are reported again.
+#
+# The agent is the smallest model the endpoint serves, so attacks have room to
+# land in condition A.
+#
+# The split setup in .env.example overrides this with openai/gpt-oss-20b on
+# Groq: qwen-3.8-27b refused every dev payload, and Groq's smaller models
+# either lack tool calling (allam-2-7b) or are gone (llama-3.1-8b-instant).
+# gpt-oss-20b shares the detector's lineage, which gives up the cross-vendor
+# separation above - report that as a limitation.
+AGENT_MODEL: str = os.getenv("AGENT_MODEL", "qwen-3.8-27b")
+# The detector is the largest, so it does not share the agent's failure modes.
+# A guard that fails wherever the thing it guards fails reports optimistic
+# recall. "Largest" is by total parameters: gpt-oss-120b is a mixture of
+# experts with ~5B active per token, so state its size that way in the report.
+DETECTOR_MODEL: str = os.getenv("DETECTOR_MODEL", "gpt-oss-120b")
 
-# Sampling is not configurable on the current model generation - `temperature`
-# was removed from the Messages API and from the SDK signature. The proposal's
-# "5 trials per payload at temperature = 0" protocol is therefore not
-# expressible. We run N trials per task instead and report the observed
-# per-payload variance, which measures determinism rather than assuming it.
-SAMPLING: str = "api-default (temperature not configurable on this model)"
+# Sampling IS expressible again. The Anthropic Messages API dropped
+# `temperature`, which is why the proposal's "N trials at temperature = 0"
+# protocol had to be abandoned; an OpenAI-compatible endpoint restores it.
+# Default 0.0 for the most reproducible runs available — still not a
+# determinism guarantee, so keep reporting per-payload variance across trials.
+AGENT_TEMPERATURE: float = float(os.getenv("AGENT_TEMPERATURE", "0.0"))
+SAMPLING: str = f"temperature={AGENT_TEMPERATURE} (openai-compatible endpoint)"
 AGENT_MAX_TOKENS: int = int(os.getenv("AGENT_MAX_TOKENS", "2048"))
 DETECTOR_MAX_TOKENS: int = int(os.getenv("DETECTOR_MAX_TOKENS", "256"))
 

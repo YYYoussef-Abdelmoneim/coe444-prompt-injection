@@ -2,7 +2,8 @@
 # builds from source, which matters because the Xcode toolchain on this machine
 # lives on an external drive.
 
-anthropic>=1.7,<2
+anthropic>=1.7,<2          # optional: only the reproducible Claude arm uses it
+openai>=1.109,<2          # agent + detector via the Cerebras OpenAI-compatible API
 sentence-transformers==3.4.1
 faiss-cpu==1.11.0
 python-dotenv==1.1.0
@@ -20,6 +21,10 @@ huggingface-hub==0.30.2
 torch==2.7.1
 
 pytest==8.3.5
+
+# Interface only (interface/app.py). Nothing in agent/, rag/, defense/ or
+# evaluation/ imports it, so a headless run of the experiment does not need it.
+flask==3.1.0
 
 # Removed from the original list, with reasons:
 #   langchain / langchain-community / langchain-core

@@ -73,6 +73,18 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 ]
 
 
+def is_required(tool_name: str, argument: str) -> bool:
+    """Whether the tool's schema requires this argument.
+
+    True for an unknown tool, so the gate denies such a call rather than
+    stripping an argument the tool may not work without.
+    """
+    for schema in TOOL_SCHEMAS:
+        if schema["name"] == tool_name:
+            return argument in schema["input_schema"].get("required", [])
+    return True
+
+
 def field_class(tool_name: str, argument: str) -> FieldClass:
     """CONTROL for anything we have not explicitly classified.
 

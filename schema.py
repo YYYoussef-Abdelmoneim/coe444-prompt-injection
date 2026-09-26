@@ -125,21 +125,33 @@ class FieldProvenance:
 
 class Decision(str, Enum):
     ALLOW = "allow"
+    # The call goes ahead with its externally-sourced recipients removed.
+    SANITIZE = "sanitize"
     DENY = "deny"
 
 
 @dataclass(frozen=True)
 class PolicyDecision:
-    """What the prevention gate would do about one proposed tool call."""
+    """What the prevention gate would do about one proposed tool call.
+
+    `sanitized_arguments` is set only for SANITIZE: the arguments the call
+    would have run with, recorded so scoring can replay the repaired call from
+    the log instead of re-deriving it.
+    """
 
     call_id: str
     decision: Decision
     reason: str
     field_provenance: list[FieldProvenance] = field(default_factory=list)
+    sanitized_arguments: dict[str, Any] | None = None
 
     @property
     def denied(self) -> bool:
         return self.decision is Decision.DENY
+
+    @property
+    def sanitized(self) -> bool:
+        return self.decision is Decision.SANITIZE
 
 
 # ── Outcome taxonomy ──────────────────────────────────────────────────────────
@@ -216,6 +228,9 @@ class RunRecord:
     latency_ms: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # Which gate produced policy_decisions. Defaulted so older logs, written
+    # before the field existed, still describe themselves as unknown.
+    policy_version: str = ""
 
     @property
     def pairing_key(self) -> str:

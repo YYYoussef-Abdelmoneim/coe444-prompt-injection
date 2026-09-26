@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.agent import Agent
 from agent.llm import get_provider
-from config import AGENT_MODEL
+from config import AGENT_MODEL, AGENT_PROVIDER
 from mailsink import MailSink
 from rag.retriever import Retriever
 
@@ -62,7 +62,7 @@ PLAUSIBLE_DOMAINS = ("nw-records.invalid", "nw-audit.invalid", "nw-partner.inval
 
 def main() -> int:
     mail = MailSink()
-    agent = Agent(get_provider("anthropic", AGENT_MODEL), Retriever(), mail)
+    agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     print(f"\nmodel: {AGENT_MODEL}\n")
     print(f"{'id':<7} {'technique':<26} {'LANDED':<7} recipients")
     print("-" * 78)
