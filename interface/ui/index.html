@@ -232,6 +232,9 @@
     border-radius: 8px; padding: 12px 14px; font-family: var(--font-mono);
     font-size: 12px; color: var(--red); white-space: pre-wrap;
   }
+  #lab-usage:empty { display: none; }
+  #lab-usage.hot { background: rgba(255,77,106,.1); border-color: var(--red); color: var(--red); }
+
   .notice-block {
     background: rgba(255,209,102,.08); border: 1px solid rgba(255,209,102,.35);
     border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: var(--yellow); line-height: 1.6;
@@ -578,7 +581,9 @@ async function runPipeline() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    renderResults(await r.json());
+    const data = await r.json();
+    renderUsage(data.usage);
+    renderResults(data);
   } catch(e) {
     renderError(e.message);
   } finally {
@@ -721,6 +726,21 @@ function markPlanted(text, planted) {
     + escHtml(after);
 }
 
+// A Lab run is the expensive one: full RAG plus the agent loop per click.
+// Advisory only, same as the Mailbox tab.
+function renderUsage(u) {
+  let box = document.getElementById('lab-usage');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'lab-usage';
+    const main = document.getElementById('main');
+    main.insertBefore(box, main.firstChild);
+  }
+  box.className = u && u.warn ? (u.runs_in_window >= u.warn_at * 2 ? 'notice-block hot' : 'notice-block') : '';
+  box.innerHTML = (u && u.warn) ? escHtml(u.message) : '';
+  box.style.display = (u && u.warn) ? 'block' : 'none';
+}
+
 function renderDetections(dets) {
   let html = `<div class="panel">
     <div class="panel-header"><span class="panel-icon">🔍</span><span class="panel-title">Detection Scores</span><span class="panel-badge">threshold 0.50</span></div>
@@ -730,15 +750,27 @@ function renderDetections(dets) {
   if (dets[0] && dets[0].error && !dets[0].chunk_id) {
     html += `<div class="error-block">${escHtml(dets[0].error)}</div>`;
   } else {
+    // A stub scores everything 0.000. Rendering that as a green "clean" verdict
+    // on the attacking chunk is the single most misleading thing this page can
+    // do, so the stub marker the API already sends wins over the score.
+    const stubbed = dets.some(d => /stub: not implemented/.test(d.model || ''));
+    if (stubbed) {
+      html += `<div class="notice-block" style="margin-bottom:12px">The detector is still the
+        starter stub: it returns 0.000 for every excerpt without looking at it. These are
+        not verdicts, and nothing below was actually checked.</div>`;
+    }
     for (const d of dets) {
       const score = typeof d.score === 'number' ? d.score : 0;
-      const cls = score >= 0.5 ? 'danger' : score >= 0.3 ? 'warn' : '';
-      const col = score >= 0.5 ? 'var(--red)' : score >= 0.3 ? 'var(--yellow)' : 'var(--green)';
-      const lbl = d.failed ? 'FAILED→FLAG' : (d.label || (score >= 0.5 ? 'injection' : 'clean'));
+      const stub = /stub: not implemented/.test(d.model || '');
+      const cls = stub ? '' : score >= 0.5 ? 'danger' : score >= 0.3 ? 'warn' : '';
+      const col = stub ? 'var(--text-muted)'
+                : score >= 0.5 ? 'var(--red)' : score >= 0.3 ? 'var(--yellow)' : 'var(--green)';
+      const lbl = stub ? 'not checked'
+                : d.failed ? 'FAILED→FLAG' : (d.label || (score >= 0.5 ? 'injection' : 'clean'));
       html += `<div class="detect-row">
         <span class="detect-id">${escHtml(d.chunk_id || '?')}</span>
-        <div class="detect-bar-wrap"><div class="detect-bar ${cls}" style="width:${(score*100).toFixed(0)}%"></div></div>
-        <span class="detect-score" style="color:${col}">${score.toFixed(3)}</span>
+        <div class="detect-bar-wrap"><div class="detect-bar ${cls}" style="width:${stub ? 0 : (score*100).toFixed(0)}%"></div></div>
+        <span class="detect-score" style="color:${col}">${stub ? '—' : score.toFixed(3)}</span>
         <span class="detect-label" style="color:${col}">${escHtml(lbl)}</span>
       </div>`;
     }

@@ -1,4 +1,4 @@
-.PHONY: test lint index demo eval ui check-independence spec-detection spec-prevention
+.PHONY: test lint index demo eval eval-dev ui check-independence spec-detection spec-prevention
 
 test:
 	python -m pytest tests/ -q
@@ -29,5 +29,16 @@ demo:
 	python cli.py demo PI-101
 
 # caffeinate -i: a sweep is tens of minutes; idle sleep kills the run.
+#
+# eval-dev is the one to use while building. `eval` opens the HELD-OUT test
+# split, which CLAUDE.md says stays unopened until the final evaluation run —
+# so it asks first. Tuning a defense against test is how you end up reporting a
+# number you fitted to.
+eval-dev:
+	caffeinate -i python cli.py eval --split dev
+
 eval:
+	@echo "This runs the HELD-OUT test split — only for the final evaluation."
+	@echo "Use 'make eval-dev' while building. Tuning against test invalidates the result."
+	@read -p "Type 'final' to continue: " ans; [ "$$ans" = final ] || { echo "aborted"; exit 1; }
 	caffeinate -i python cli.py eval --split test

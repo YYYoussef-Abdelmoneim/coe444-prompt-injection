@@ -1135,7 +1135,7 @@ function renderVerdict(a) {
         ${chip('Prevention', !!(df.prevention || {}).on, !!(df.prevention || {}).implemented)}
         ${gateChips}
       </div>
-      <div class="v-fixed">One live run under the switches you set. Reported numbers come from logs/*.jsonl via the Lab tab, never from here.</div>
+      <div class="v-fixed">One live run under the switches you set. Reported numbers come from logs/*.jsonl via `make eval`, never from either tab.</div>
     </div>
   </section>`;
 }
