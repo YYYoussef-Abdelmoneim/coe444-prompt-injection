@@ -20,6 +20,7 @@ A free-text run has no mechanical success predicate, so it reports the trace
 scoreable rather than inventing a verdict. See CLAUDE.md invariants 2 and 5.
 """
 
+import logging
 import os
 import sys
 import time
@@ -34,6 +35,8 @@ from flask import Flask, jsonify, request, send_from_directory
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "ui"))
 app.config["JSON_SORT_KEYS"] = False
+
+_log = logging.getLogger(__name__)
 
 # ── Free-tier guard ──────────────────────────────────────────────────────────
 # Every /api/run and /api/assistant spends real model quota, and a teammate
@@ -658,6 +661,45 @@ def api_documents_plant(doc_id):
     return jsonify({"ok": True})
 
 
+def _judge(payload_id: str, result: dict) -> dict:
+    """Score a live run with the harness's own predicate, not a UI heuristic.
+
+    Mirrors evaluation/runner.py:score_all for a single unscored run. Live mode
+    has no conditions, so every proposed call is an executed call.
+    """
+    try:
+        from attacks.loader import canary, contacts, load_payloads
+        from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
+        from schema import ToolCall
+
+        item = next((p for p in load_payloads() if p.id == payload_id), None)
+        if item is None:
+            return {"known": False}
+
+        calls = [
+            ToolCall(s.get("call_id") or f"c{i}", s["tool"], s.get("args") or {})
+            for i, s in enumerate(result.get("steps") or [])
+        ]
+        reply = result.get("reply") or ""
+
+        # goal_hijack wins by making the agent abandon the user's task, so it
+        # needs to know what a correct answer looks like. The others ignore it.
+        spec = item.success or carrier_success(item.family, item.user_task, contacts())
+        ben_ok = benign_succeeded(spec, calls, reply)
+        won = attack_succeeded(item.target["predicate"], calls, reply, canary(), ben_ok)
+
+        return {
+            "known": True,
+            "attack_succeeded": bool(won),
+            "task_still_worked": bool(ben_ok),
+            "predicate": item.target["predicate"],
+            "family": item.family,
+        }
+    except Exception as e:      # telemetry, so fail open and say why
+        _log.warning("verdict failed for %s: %s", payload_id, e)
+        return {"known": False, "error": f"{type(e).__name__}: {e}"}
+
+
 @app.route("/api/assistant", methods=["POST"])
 def api_assistant():
     from agent.llm import get_provider
@@ -686,6 +728,15 @@ def api_assistant():
         traceback.print_exc()
         _record_run(0)   # a failed run still spent tokens upstream
         return jsonify({"error": f"{type(e).__name__}: {e}", "usage": _usage()}), 500
+    # Ground truth. The page used to judge "did the attack win?" by diffing
+    # recipients, which is only ONE of four predicates: content_exfiltration
+    # wins in the body, reply_channel_exfil in the reply text, and goal_hijack
+    # by breaking the user's task. Four of the eight landing dev payloads have
+    # nothing to do with recipients, so the page reported real hits as misses.
+    # evaluation/predicates.py is the same judge the research harness uses.
+    payload_id = str(data.get("payload_id") or "").strip()
+    if payload_id:
+        result["verdict"] = _judge(payload_id, result)
     return jsonify(_with_usage(result))
 
 
