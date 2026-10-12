@@ -3,7 +3,8 @@
   python cli.py index                    build the FAISS index
   python cli.py ask "..."                one query, no attack
   python cli.py demo PI-101              show one payload under all four conditions
-  python cli.py eval [--split test]      run the corpus and print the results table
+  python cli.py eval [--only ID,...]     run the dev split and print the results table
+  python cli.py eval --split test --final   the held-out split, once, at the end (make eval)
   python cli.py report <scored.jsonl>    recompute metrics from an existing log
   python cli.py rescore <run.jsonl> [--threshold t] [--write]
                                          re-score a raw run log, no API call
@@ -49,9 +50,11 @@ def cmd_demo(args: argparse.Namespace) -> int:
     from conditions import ALL_CONDITIONS, DEFAULT_DETECTION_THRESHOLD, is_flagged
     from evaluation.runner import Runner
 
-    payloads = {p.id: p for p in load_payloads()}
+    # Dev only: the demo prints the payload text, and the test split stays
+    # unread until the final evaluation.
+    payloads = {p.id: p for p in load_payloads("dev")}
     if args.payload_id not in payloads:
-        print(f"Unknown payload {args.payload_id}. Available: {', '.join(sorted(payloads))}")
+        print(f"{args.payload_id} is not a dev payload. Dev payloads: {', '.join(sorted(payloads))}")
         return 1
     payload = payloads[args.payload_id]
 
@@ -86,12 +89,28 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
 def cmd_eval(args: argparse.Namespace) -> int:
     from evaluation.metrics import summary_table
+
+    if args.split == "test" and not args.final:
+        print("The test split is held out until the final evaluation run (CLAUDE.md).\n"
+              "Use `make eval`, which asks first. Develop on --split dev.")
+        return 2
+    only = None
+    if args.only:
+        from attacks.loader import load_benign, load_payloads
+
+        only = {i.strip() for i in args.only.split(",") if i.strip()}
+        dev_ids = {p.id for p in load_payloads("dev")} | {t.id for t in load_benign("dev")}
+        unknown = sorted(only - dev_ids)
+        if unknown:
+            print(f"--only takes dev ids; not in the dev split: {', '.join(unknown)}")
+            return 2
+
     from evaluation.runner import Runner
 
     runner = Runner(trials=args.trials)
-    _, outcomes = runner.run_all(split=args.split)
+    records, outcomes = runner.run_all(split=args.split, only=only)
     print()
-    print(summary_table(outcomes))
+    print(summary_table(outcomes, records=records))
     return 0
 
 
@@ -140,7 +159,7 @@ def cmd_rescore(args: argparse.Namespace) -> int:
     return 0
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="coe444")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -155,7 +174,12 @@ def main() -> int:
     p_demo.set_defaults(fn=cmd_demo)
 
     p_eval = sub.add_parser("eval")
-    p_eval.add_argument("--split", default=None, choices=["dev", "test"])
+    # Defaults to dev. With no default the sweep ran both splits, which is how
+    # the held-out test split gets opened by accident.
+    p_eval.add_argument("--split", default="dev", choices=["dev", "test"])
+    p_eval.add_argument("--final", action="store_true",
+                        help="required with --split test: this is the single final run")
+    p_eval.add_argument("--only", default=None, help="comma-separated dev ids, for smoke runs")
     p_eval.add_argument("--trials", type=int, default=3)
     p_eval.set_defaults(fn=cmd_eval)
 
@@ -170,9 +194,12 @@ def main() -> int:
     p_res.add_argument("--write", action="store_true", help="save the scored rows next to the log")
     p_res.add_argument("--out", default=None, help="where --write saves them")
     p_res.set_defaults(fn=cmd_rescore)
+    return parser
 
-    args = parser.parse_args()
-    if getattr(args, "threshold", None) is None and args.cmd == "rescore":
+
+def main() -> int:
+    args = build_parser().parse_args()
+    if args.cmd == "rescore" and args.threshold is None:
         from conditions import DEFAULT_DETECTION_THRESHOLD
 
         args.threshold = DEFAULT_DETECTION_THRESHOLD

@@ -317,7 +317,7 @@ def api_payloads():
                     # attacker without reading evaluation/predicates.py.
                     "predicate": p.target.get("predicate"),
                 }
-                for p in load_payloads(split=None)
+                for p in load_payloads(split="dev")
             ]
         )
     except Exception as e:
@@ -338,7 +338,7 @@ def api_benign():
                     "hard_negative": t.hard_negative,
                     "split": t.split,
                 }
-                for t in load_benign(split=None)
+                for t in load_benign(split="dev")
             ]
         )
     except Exception as e:
@@ -411,14 +411,14 @@ def api_run():
         item = None
         is_attack = False
         if payload_id:
-            item = next((p for p in load_payloads() if p.id == payload_id), None)
+            item = next((p for p in load_payloads(split="dev") if p.id == payload_id), None)
             if item is None:
-                return jsonify({**result, "error": f"Unknown payload {payload_id}"}), 400
+                return jsonify({**result, "error": f"Unknown dev payload {payload_id}"}), 400
             is_attack = True
         elif benign_id:
-            item = next((t for t in load_benign() if t.id == benign_id), None)
+            item = next((t for t in load_benign(split="dev") if t.id == benign_id), None)
             if item is None:
-                return jsonify({**result, "error": f"Unknown benign task {benign_id}"}), 400
+                return jsonify({**result, "error": f"Unknown dev benign task {benign_id}"}), 400
 
         if item is not None:
             return jsonify(_with_usage(run_scored(result, item, is_attack)))
@@ -684,7 +684,7 @@ def _judge(payload_id: str, result: dict) -> dict:
         from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
         from schema import ToolCall
 
-        item = next((p for p in load_payloads() if p.id == payload_id), None)
+        item = next((p for p in load_payloads(split="dev") if p.id == payload_id), None)
         if item is None:
             return {"known": False}
 

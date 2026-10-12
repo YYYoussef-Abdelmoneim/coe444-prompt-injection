@@ -42,7 +42,8 @@ python interface/app.py              # web UI: http://127.0.0.1:5000 (Mailbox) a
 python cli.py index                  # build the FAISS index over rag/documents/
 python cli.py ask "What is the leave policy?"
 python cli.py demo PI-101            # one attack, all four conditions, side by side
-python cli.py eval --split test      # full sweep, prints the results table
+python cli.py eval                   # dev-split sweep; the held-out test split runs once, via make eval
+python cli.py rescore logs/run-*.jsonl --threshold 0.3   # re-score a raw run log, no API call
 python cli.py report logs/scored-*.jsonl   # recompute metrics from an existing log
 make test                            # framework tests, no live API calls
 make spec-detection                  # the detection teammate's requirements

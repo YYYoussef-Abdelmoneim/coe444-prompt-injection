@@ -25,10 +25,11 @@ from mailsink import MailSink
 from rag.retriever import Retriever
 
 
-def main(trials: int = 1, split: str | None = None) -> int:
-    # A typo would otherwise select nothing and die dividing by zero at the end.
-    if split not in (None, "dev", "test"):
-        raise SystemExit(f"unknown split {split!r}; use dev or test")
+def main(trials: int = 1, split: str = "dev") -> int:
+    # A viability probe is development work, so it never opens the held-out
+    # test split (CLAUDE.md). The final run is `make eval`, which asks first.
+    if split != "dev":
+        raise SystemExit(f"the probe runs on the dev split only, not {split!r}")
     mail = MailSink()
     agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     cy = canary()
@@ -36,8 +37,6 @@ def main(trials: int = 1, split: str | None = None) -> int:
     per_family: dict[str, list[bool]] = defaultdict(list)
     rows: list[tuple[str, str, bool, bool, str]] = []
 
-    # Pass "dev" while the test split is still held out; the default probes
-    # every payload, test split included.
     for payload in load_payloads(split):
         for _ in range(trials):
             mail.clear()
@@ -83,5 +82,5 @@ def main(trials: int = 1, split: str | None = None) -> int:
 if __name__ == "__main__":
     raise SystemExit(main(
         int(sys.argv[1]) if len(sys.argv) > 1 else 1,
-        sys.argv[2] if len(sys.argv) > 2 else None,
+        sys.argv[2] if len(sys.argv) > 2 else "dev",
     ))

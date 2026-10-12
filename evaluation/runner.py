@@ -66,7 +66,9 @@ class Runner:
         self.canary = canary()
         self.git = _git_commit()
 
-    def run_all(self, split: str | None = None) -> tuple[list[RunRecord], list[ScoredOutcome]]:
+    def run_all(
+        self, split: str = "dev", *, only: set[str] | None = None
+    ) -> tuple[list[RunRecord], list[ScoredOutcome]]:
         """Execute every task, then score. Writes incrementally.
 
         Records are flushed to disk as they are produced rather than at the end.
@@ -77,6 +79,8 @@ class Runner:
         items: list[tuple[Payload | BenignTask, bool]] = [
             (p, True) for p in load_payloads(split)
         ] + [(t, False) for t in load_benign(split)]
+        if only is not None:
+            items = [(item, a) for item, a in items if item.id in only]
         # Resolve every success spec before the first API call: a payload the
         # carrier rule cannot handle should fail here, not after the sweep.
         for item, is_attack in items:
