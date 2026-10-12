@@ -222,6 +222,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_var.add_argument("--out-dir", default="results")
     p_var.set_defaults(fn=cmd_detector_variance)
 
+    p_prog = sub.add_parser("progress-report", help="Step E summary and figures, from logs only")
+    p_prog.add_argument("eval_log", help="the dev evaluation run log (logs/run-*.jsonl)")
+    p_prog.add_argument("--threshold", type=float, default=None)
+    p_prog.add_argument("--dev-log", default="logs/detector-20261012T203528Z.jsonl")
+    p_prog.add_argument("--external-log", default=None, help="default: the newest logs/detector-external-*.jsonl")
+    p_prog.add_argument("--llmail-log", default="logs/run-20261012T202019Z.jsonl")
+    p_prog.add_argument("--out-dir", default="results")
+    p_prog.set_defaults(fn=cmd_progress_report)
+
     p_roc = sub.add_parser("roc", help="ROC, AUC and the dev threshold from a detector log")
     p_roc.add_argument("detector_log")
     p_roc.add_argument("--write", action="store_true", help="write the threshold report and figure")
@@ -310,6 +319,20 @@ def cmd_roc(args: argparse.Namespace) -> int:
     if args.write:
         out = write_threshold_report(rows, Path(args.detector_log), Path(args.out_dir))
         print(f"\nwrote {', '.join(str(p) for p in out)}")
+    return 0
+
+
+def cmd_progress_report(args: argparse.Namespace) -> int:
+    """Step E: results/progress_summary.md and its figures, from logs only."""
+    from conditions import DEFAULT_DETECTION_THRESHOLD
+    from evaluation.progress import write_progress_summary
+
+    external = Path(args.external_log) if args.external_log else next(
+        iter(sorted(Path("logs").glob("detector-external-*.jsonl"), reverse=True)), None)
+    out = write_progress_summary(Path(args.eval_log), dev_log=Path(args.dev_log), external_log=external,
+                                 llmail_log=Path(args.llmail_log), out_dir=Path(args.out_dir),
+                                 threshold=args.threshold if args.threshold is not None else DEFAULT_DETECTION_THRESHOLD)
+    print("wrote " + ", ".join(str(p) for p in out))
     return 0
 
 
