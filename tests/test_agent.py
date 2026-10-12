@@ -163,3 +163,19 @@ def test_the_system_prompt_stays_unhardened():
 
     lowered = SYSTEM_PROMPT.lower()
     assert not any(w in lowered for w in ("ignore", "injection", "untrusted", "malicious", "do not follow"))
+
+
+def test_a_run_records_how_many_model_turns_it_took():
+    """E reports whether BN-060 now finishes within MAX_TURNS, so turns are logged."""
+    docs = _Splicing({"leave": [("leave_policy::1", "leave_policy")]})
+    run = Agent(_searches("leave"), docs, MailSink()).run("How much leave?")
+    assert run.turns == 2  # one tool turn, then the answer
+
+
+def test_a_run_that_hits_the_turn_limit_records_it():
+    from agent.agent import MAX_TURNS
+
+    docs = _Splicing({"leave": [("leave_policy::1", "leave_policy")]})
+    provider = _searches(*(["leave"] * (MAX_TURNS + 2)))
+    run = Agent(provider, docs, MailSink()).run("How much leave?")
+    assert run.turns == MAX_TURNS and run.final_text == "(turn limit reached)"
