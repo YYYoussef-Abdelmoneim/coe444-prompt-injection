@@ -201,7 +201,61 @@ def build_parser() -> argparse.ArgumentParser:
     p_res.add_argument("--write", action="store_true", help="save the scored rows next to the log")
     p_res.add_argument("--out", default=None, help="where --write saves them")
     p_res.set_defaults(fn=cmd_rescore)
+
+    p_det = sub.add_parser("detector-eval", help="score the fixed dev excerpt set (Cerebras)")
+    p_det.add_argument("--baseline-log", default="logs/run-20260927T082229Z.jsonl",
+                       help="dev run log that records each payload's host chunk")
+    p_det.set_defaults(fn=cmd_detector_eval)
+
+    p_roc = sub.add_parser("roc", help="ROC, AUC and the dev threshold from a detector log")
+    p_roc.add_argument("detector_log")
+    p_roc.add_argument("--write", action="store_true", help="write the threshold report and figure")
+    p_roc.add_argument("--out-dir", default="results")
+    p_roc.set_defaults(fn=cmd_roc)
     return parser
+
+
+def cmd_detector_eval(args: argparse.Namespace) -> int:
+    """Score the fixed dev excerpt set with the LLM detector and the keyword
+    baseline, and log every verdict. Cached verdicts cost no call, so a run that
+    stopped on a free-tier limit is simply run again."""
+    from datetime import datetime, timezone
+
+    from agent.llm import QuotaExhausted
+    from config import DETECTOR_CACHE_PATH, LOG_DIR
+    from defense.detection import DETECTOR_PROMPT_VERSION, Detector
+    from defense.detection_baseline import BASELINE_VERSION, KeywordDetector
+    from defense.verdict_cache import VerdictCache
+    from evaluation.detector_eval import dev_excerpts, score_excerpts, summary, write_log
+
+    excerpts = dev_excerpts(Path(args.baseline_log))
+    poisoned = sum(e.kind == "poisoned" for e in excerpts)
+    print(f"{len(excerpts)} dev excerpts: {len(excerpts) - poisoned} clean, {poisoned} poisoned; "
+          f"detector {DETECTOR_PROMPT_VERSION}\n")
+    try:
+        rows = score_excerpts(excerpts, Detector(cache=VerdictCache(DETECTOR_CACHE_PATH)),
+                              name="llm", version=DETECTOR_PROMPT_VERSION)
+    except QuotaExhausted as exc:
+        print(f"\nSTOPPED, free-tier limit: {exc}\nVerdicts so far are cached; run this again later.")
+        return 3
+    rows += score_excerpts(excerpts, KeywordDetector(), name="keyword", version=BASELINE_VERSION)
+    path = LOG_DIR / f"detector-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    write_log(rows, path)
+    print(f"\nwrote {len(rows)} verdicts to {path}\n")
+    print(summary(rows))
+    return 0
+
+
+def cmd_roc(args: argparse.Namespace) -> int:
+    """ROC, AUC and the threshold rule from a detector log; writes the report."""
+    from evaluation.detector_eval import load_log, summary, write_threshold_report
+
+    rows = load_log(Path(args.detector_log))
+    print(summary(rows))
+    if args.write:
+        out = write_threshold_report(rows, Path(args.detector_log), Path(args.out_dir))
+        print(f"\nwrote {', '.join(str(p) for p in out)}")
+    return 0
 
 
 def main() -> int:

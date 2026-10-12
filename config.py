@@ -73,7 +73,12 @@ DETECTOR_MODEL: str = os.getenv("DETECTOR_MODEL", "gpt-oss-120b")
 AGENT_TEMPERATURE: float = float(os.getenv("AGENT_TEMPERATURE", "0.0"))
 SAMPLING: str = f"temperature={AGENT_TEMPERATURE} (openai-compatible endpoint)"
 AGENT_MAX_TOKENS: int = int(os.getenv("AGENT_MAX_TOKENS", "2048"))
-DETECTOR_MAX_TOKENS: int = int(os.getenv("DETECTOR_MAX_TOKENS", "256"))
+# gpt-oss reasons before it answers, and reasoning tokens count against this
+# budget: at 256 the verdict tool call can be cut off, which reads as a
+# fail-closed detection. 1024 leaves room; reasoning_effort keeps it short.
+DETECTOR_MAX_TOKENS: int = int(os.getenv("DETECTOR_MAX_TOKENS", "1024"))
+# Sent only when non-empty, since not every endpoint accepts the parameter.
+DETECTOR_REASONING_EFFORT: str = os.getenv("DETECTOR_REASONING_EFFORT", "low")
 
 # ── Free-tier pacing ──────────────────────────────────────────────────────────
 # The budget is $0, so requests are spaced on our side to stay under the free
@@ -110,6 +115,9 @@ EXTERNAL_ROOT = Path(os.getenv("COE444_DATA_ROOT", str(BASE_DIR / ".data")))
 
 DOCUMENTS_DIR = Path(os.getenv("DOCUMENTS_DIR", str(BASE_DIR / "rag" / "documents")))
 FAISS_INDEX_PATH = Path(os.getenv("FAISS_INDEX_PATH", str(EXTERNAL_ROOT / "faiss_index")))
+# Detector verdicts keyed by (excerpt text, prompt version, model), so a rerun or a
+# repeated excerpt costs no free-tier quota. Disposable: delete it to re-ask.
+DETECTOR_CACHE_PATH = Path(os.getenv("DETECTOR_CACHE_PATH", str(EXTERNAL_ROOT / "detector_cache.sqlite")))
 LOG_DIR = Path(os.getenv("LOG_DIR", str(BASE_DIR / "logs")))
 RESULTS_DIR = Path(os.getenv("RESULTS_DIR", str(BASE_DIR / "results")))
 

@@ -142,9 +142,11 @@ def load_all():
 
     if "detector" not in _cache:
         try:
+            from config import DETECTOR_CACHE_PATH
             from defense.detection import Detector
+            from defense.verdict_cache import VerdictCache
 
-            _cache["detector"] = Detector()
+            _cache["detector"] = Detector(cache=VerdictCache(DETECTOR_CACHE_PATH))
         except Exception as e:
             errors["detector"] = str(e)
 
@@ -736,6 +738,7 @@ def api_assistant():
             gate=get_playground_gate(),
             detection_on=bool(data.get("detection")),
             prevention_on=bool(data.get("prevention")),
+            detection_mode="remove_span" if data.get("detection_mode") == "remove_span" else "withhold",
         )
     except Exception as e:
         traceback.print_exc()

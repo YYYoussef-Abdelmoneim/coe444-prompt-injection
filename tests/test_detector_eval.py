@@ -60,3 +60,19 @@ def test_the_cli_has_the_detector_commands():
 
     assert build_parser().parse_args(["detector-eval"]).cmd == "detector-eval"
     assert build_parser().parse_args(["roc", "logs/detector-x.jsonl"]).cmd == "roc"
+
+
+def test_the_threshold_report_and_its_figure_are_written(tmp_path):
+    from evaluation.detector_eval import write_threshold_report
+
+    rows = []
+    for name, version in (("llm", "detector-vX"), ("keyword", "keyword-v1")):
+        rows += [{"detector": name, "version": version, "model": "m", "kind": "poisoned", "score": s,
+                  "error": None, "payload_id": f"PI-{i}", "family": "f", "gate_applicable": True, "span": "x",
+                  "excerpt_id": f"h+PI-{i}"} for i, s in enumerate((0.9, 0.8, 0.3))]
+        rows += [{"detector": name, "version": version, "model": "m", "kind": "clean", "score": s,
+                  "error": None, "excerpt_id": f"c::{i}"} for i, s in enumerate((0.1, 0.0, 0.6))]
+    png, md = write_threshold_report(rows, tmp_path / "detector-x.jsonl", tmp_path)
+    assert png.stat().st_size > 10_000
+    text = md.read_text()
+    assert "Chosen threshold: 0.80" in text and "| PI-2 | f | yes | 0.30 | **no** |" in text

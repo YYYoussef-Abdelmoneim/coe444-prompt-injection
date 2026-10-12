@@ -35,6 +35,7 @@ from config import (
     CEREBRAS_MIN_INTERVAL_S,
     CEREBRAS_TOKENS_PER_MINUTE,
     DETECTOR_MAX_TOKENS,
+    DETECTOR_REASONING_EFFORT,
     GROQ_API_KEY,
     GROQ_BASE_URL,
     GROQ_MIN_INTERVAL_S,
@@ -458,6 +459,7 @@ class OpenAICompatProvider(LLMProvider):
                 "parameters": schema,
             },
         }
+        extra = {"reasoning_effort": DETECTOR_REASONING_EFFORT} if DETECTOR_REASONING_EFFORT else {}
         resp = self._create(
             model=self.model,
             max_tokens=DETECTOR_MAX_TOKENS,
@@ -468,6 +470,7 @@ class OpenAICompatProvider(LLMProvider):
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_text},
             ],
+            **extra,
         )
         for tc in resp.choices[0].message.tool_calls or []:
             if tc.function.name == "record_verdict":
