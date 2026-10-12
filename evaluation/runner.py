@@ -65,8 +65,9 @@ class Runner:
         self.agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), self.retriever, self.mail,
                            directory=self.directory)
         self.detector = detector if detector is not None else Detector()
+        # Scoring ground truth for "to my manager"-style tasks; never shown to the gate.
         self.contacts = contacts()
-        self.gate = ProvenanceGate(contacts=frozenset(self.contacts.values()))
+        self.gate = ProvenanceGate(internal_domains=self.directory.internal_domains)
         self.canary = canary()
         self.git = _git_commit()
 

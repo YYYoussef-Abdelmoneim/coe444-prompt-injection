@@ -131,6 +131,12 @@ class Decision(str, Enum):
     ALLOW = "allow"
     # The call goes ahead with its externally-sourced recipients removed.
     SANITIZE = "sanitize"
+    # The call goes ahead as proposed once the user confirms the recipients in
+    # PolicyDecision.needs_confirmation: an outside address the user typed, or
+    # a company address seen only in retrieved content. The harness and the
+    # Mailbox have no human in the loop, so the approval is simulated and the
+    # call executes; scoring treats it like ALLOW.
+    CONFIRM = "confirm"
     DENY = "deny"
 
 
@@ -148,6 +154,11 @@ class PolicyDecision:
     reason: str
     field_provenance: list[FieldProvenance] = field(default_factory=list)
     sanitized_arguments: dict[str, Any] | None = None
+    # The recipient tokens the gate removed, and the addresses that go out only
+    # after the user confirms. Logged on every call, so a run shows exactly what
+    # the gate did; defaulted so older logs still load.
+    stripped: list[str] = field(default_factory=list)
+    needs_confirmation: list[str] = field(default_factory=list)
 
     @property
     def denied(self) -> bool:
@@ -156,6 +167,10 @@ class PolicyDecision:
     @property
     def sanitized(self) -> bool:
         return self.decision is Decision.SANITIZE
+
+    @property
+    def confirmed(self) -> bool:
+        return self.decision is Decision.CONFIRM
 
 
 # ── Outcome taxonomy ──────────────────────────────────────────────────────────

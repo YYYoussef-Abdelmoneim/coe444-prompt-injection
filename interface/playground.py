@@ -419,13 +419,19 @@ class _LiveMail(MailBackend):
                 entry.update(decision="deny", reason=f"gate error: {type(exc).__name__}: {exc}", sent=None)
                 run.gate_log.append(entry)
                 raise PermissionError("The security gate failed, so the email was not sent.") from exc
-            entry.update(decision=d.decision.value, reason=d.reason)
+            entry.update(decision=getattr(d.decision, "value", d.decision), reason=d.reason)
             if d.denied:
                 entry["sent"] = None
                 run.gate_log.append(entry)
                 raise PermissionError(f"The security gate blocked this email: {d.reason}")
             if d.sanitized:
                 final = {k: v for k, v in (d.sanitized_arguments or {}).items() if v}
+            approve = list(getattr(d, "needs_confirmation", None) or [])
+            if approve:
+                # No human in the loop here, so the employee is taken to approve:
+                # the same simulated approval the research harness scores by.
+                entry["approval"] = {"simulated": True, "approved": True, "by": EMPLOYEE["address"],
+                                     "at": _now(), "recipients": approve}
             entry["sent"] = dict(final)
         run.gate_log.append(entry)
 
@@ -434,6 +440,8 @@ class _LiveMail(MailBackend):
             body=str(final.get("body", "")), cc=final.get("cc"), bcc=final.get("bcc"),
         )
         gate_note = None if entry["decision"] == "off" else {"decision": entry["decision"], "reason": entry["reason"]}
+        if gate_note and "approval" in entry:
+            gate_note["approval"] = entry["approval"]
         run._pending.append(run.box._sent_entry(final, via="assistant", gate=gate_note))
 
         removed = [
