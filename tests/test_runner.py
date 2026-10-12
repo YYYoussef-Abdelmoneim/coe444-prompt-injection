@@ -62,3 +62,23 @@ def test_the_gate_judges_each_call_on_what_had_been_read_before_it():
     rec = runner._one(_benign(), 1, is_attack=False)
     assert seen["gate"] == {"e1": ["hr_policy::2"], "e2": ["hr_policy::2", "directory::manager@northwind.example"]}
     assert rec.context_at == {"e1": 1, "e2": 2}
+
+
+def test_a_lookup_made_after_the_email_cannot_vouch_for_it():
+    """With the real gate: the same lookup that makes an email trusted when it came
+    first is ignored when it came after the email was sent."""
+    from defense.prevention import ProvenanceGate
+
+    send = ToolCall("e1", "send_email", {"to": "manager@northwind.example", "subject": "s", "body": "b"})
+    look = ToolCall("l1", "lookup_contact", {"query": "my manager"})
+    gate = ProvenanceGate(internal_domains=frozenset({"northwind.example"}))
+
+    late = AgentRun(user_prompt="q", chunks=[LOOKUP], proposed_calls=[send, look], context_at={"e1": 0, "l1": 0})
+    runner, _ = _runner(late)
+    runner.gate = gate
+    assert runner._one(_benign(), 1, is_attack=False).policy_decisions[0].decision is Decision.DENY
+
+    early = AgentRun(user_prompt="q", chunks=[LOOKUP], proposed_calls=[look, send], context_at={"l1": 0, "e1": 1})
+    runner, _ = _runner(early)
+    runner.gate = gate
+    assert runner._one(_benign(), 1, is_attack=False).policy_decisions[1].decision is Decision.ALLOW

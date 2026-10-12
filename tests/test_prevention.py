@@ -32,5 +32,5 @@ def test_the_starter_gate_keeps_the_interface_the_harness_calls(chunk):
     from schema import ToolCall
 
     calls = [ToolCall("c1", "send_email", {"to": "a@b.example"}), ToolCall("c2", "search_documents", {"query": "q"})]
-    decisions = ProvenanceGate(contacts=frozenset({"A@B.example"})).evaluate_all(calls, "hi", [chunk()])
+    decisions = ProvenanceGate(internal_domains=frozenset({"B.example"})).evaluate_all(calls, "hi", [chunk()])
     assert [d.call_id for d in decisions] == ["c1", "c2"]

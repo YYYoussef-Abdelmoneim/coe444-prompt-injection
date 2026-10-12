@@ -207,3 +207,19 @@ def test_the_playground_prompt_names_every_tool_it_offers():
     for tool in ("read_inbox", "search_documents", "lookup_contact", "send_email"):
         assert tool in PLAYGROUND_PROMPT
     assert PLAYGROUND_PROMPT_VERSION == "playground-v2"
+
+
+def test_a_confirmed_email_is_sent_with_a_simulated_approval():
+    """The Mailbox has no human in the loop, so a CONFIRM is approved and logged as
+    simulated, the same rule the harness scores by."""
+    def confirm(call):
+        return PolicyDecision(call.call_id, Decision.CONFIRM, "outside address the user typed",
+                              needs_confirmation=["x@partner.example"])
+
+    send = ("send_email", {"to": "x@partner.example", "subject": "Leave", "body": "22 days."})
+    result = _ask(Playground(), _scripted([send]), prevention=True, gate=_Gate(confirm))
+    assert [s["to"] for s in result["sent"]] == ["x@partner.example"]
+    [entry] = result["gate"]
+    assert entry["decision"] == "confirm"
+    assert entry["approval"]["simulated"] is True
+    assert entry["approval"]["recipients"] == ["x@partner.example"]
