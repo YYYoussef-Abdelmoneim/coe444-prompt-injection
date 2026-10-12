@@ -4,6 +4,12 @@
 __pycache__/
 *.pyc
 logs/*.jsonl
+# Runs stay local so the repo doesn't fill with every sweep. A log that backs a
+# reported number is evidence, so it is tracked by name. The 27 Sep dev baseline
+# is the one METHODOLOGY sections 4 and 5 cite. Its scored file is tracked too,
+# because cli.py report reads scored logs and nothing can re-score a raw one yet.
+!logs/run-20260927T082229Z.jsonl
+!logs/scored-20260927T082229Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store

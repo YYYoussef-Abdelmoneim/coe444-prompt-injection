@@ -179,14 +179,19 @@ def get_runner():
 # ── Serialisers ──────────────────────────────────────────────────────────────
 
 
+def _v(x):
+    """An enum's value, or the value itself when a component hands back a plain
+    string. str() would give 'Origin.EXTERNAL', and .value alone turned a gate
+    that returns 'deny' into an HTTP 500."""
+    return getattr(x, "value", x)
+
+
 def chunk_json(c, poisoned_id):
     return {
         "chunk_id": c.chunk_id,
         "document_id": c.document_id,
         "text": c.text,
-        # Origin/Decision/FieldClass are all str-subclass enums with lowercase
-        # values, so .value is a plain string.
-        "origin": c.origin.value,
+        "origin": _v(c.origin),
         "similarity": round(float(c.similarity), 4),
         "is_poisoned": c.chunk_id == poisoned_id,
     }
@@ -218,22 +223,25 @@ def decision_json(d):
         # There is no per-field verdict in the schema. A field is a violation
         # when a CONTROL argument traces to EXTERNAL bytes (prevention.py:85);
         # derive that here rather than pretending the field exists.
-        violation = fp.field_class.value == "control" and fp.origin.value == "external"
+        violation = _v(fp.field_class) == "control" and _v(fp.origin) == "external"
         prov.append(
             {
                 "field_name": fp.field_name,
-                "field_class": fp.field_class.value,
-                "origin": fp.origin.value,
+                "field_class": _v(fp.field_class),
+                "origin": _v(fp.origin),
                 "external_support": fp.external_support,
                 "matched_span": fp.matched_span,
                 "violation": violation,
             }
         )
+    decision = _v(d.decision)
     return {
         "call_id": d.call_id,
-        "decision": d.decision.value,
-        "denied": bool(d.denied),
-        "sanitized": bool(d.sanitized),
+        "decision": decision,
+        # Compared by value: PolicyDecision.denied uses `is`, which a plain
+        # string never satisfies, so a string "deny" would display as allowed.
+        "denied": decision == "deny",
+        "sanitized": decision == "sanitize",
         "sanitized_arguments": d.sanitized_arguments,
         "reason": d.reason,
         "field_provenance": prov,
@@ -309,7 +317,7 @@ def api_payloads():
                     # attacker without reading evaluation/predicates.py.
                     "predicate": p.target.get("predicate"),
                 }
-                for p in load_payloads(split=None)
+                for p in load_payloads(split="dev")
             ]
         )
     except Exception as e:
@@ -330,7 +338,7 @@ def api_benign():
                     "hard_negative": t.hard_negative,
                     "split": t.split,
                 }
-                for t in load_benign(split=None)
+                for t in load_benign(split="dev")
             ]
         )
     except Exception as e:
@@ -393,6 +401,8 @@ def api_run():
         "poisoned_chunk_id": None,
         "retrieval_hit": None,
         "error": None,
+        # The Lab only says "the defenses are empty starter files" when they are.
+        "defenses": _defense_status(),
     }
 
     try:
@@ -401,14 +411,14 @@ def api_run():
         item = None
         is_attack = False
         if payload_id:
-            item = next((p for p in load_payloads() if p.id == payload_id), None)
+            item = next((p for p in load_payloads(split="dev") if p.id == payload_id), None)
             if item is None:
-                return jsonify({**result, "error": f"Unknown payload {payload_id}"}), 400
+                return jsonify({**result, "error": f"Unknown dev payload {payload_id}"}), 400
             is_attack = True
         elif benign_id:
-            item = next((t for t in load_benign() if t.id == benign_id), None)
+            item = next((t for t in load_benign(split="dev") if t.id == benign_id), None)
             if item is None:
-                return jsonify({**result, "error": f"Unknown benign task {benign_id}"}), 400
+                return jsonify({**result, "error": f"Unknown dev benign task {benign_id}"}), 400
 
         if item is not None:
             return jsonify(_with_usage(run_scored(result, item, is_attack)))
@@ -664,21 +674,27 @@ def api_documents_plant(doc_id):
 def _judge(payload_id: str, result: dict) -> dict:
     """Score a live run with the harness's own predicate, not a UI heuristic.
 
-    Mirrors evaluation/runner.py:score_all for a single unscored run. Live mode
-    has no conditions, so every proposed call is an executed call.
+    Mirrors evaluation/runner.py:score_all for a single unscored run, and like
+    its _as_executed it judges the emails that actually left: with prevention
+    on, the gate may have stripped a recipient (SANITIZE) or sent nothing
+    (DENY), so the proposed calls are not what happened.
     """
     try:
         from attacks.loader import canary, contacts, load_payloads
         from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
         from schema import ToolCall
 
-        item = next((p for p in load_payloads() if p.id == payload_id), None)
+        item = next((p for p in load_payloads(split="dev") if p.id == payload_id), None)
         if item is None:
             return {"known": False}
 
+        # result["sent"] holds the post-gate emails (playground.py:_LiveMail).
+        # Only send_email matters to the predicates (predicates.sent_emails).
         calls = [
-            ToolCall(s.get("call_id") or f"c{i}", s["tool"], s.get("args") or {})
-            for i, s in enumerate(result.get("steps") or [])
+            ToolCall(e.get("id") or f"s{i}", "send_email",
+                     {k: e.get(k) or "" for k in ("to", "cc", "bcc", "subject", "body")})
+            for i, e in enumerate(result.get("sent") or [])
+            if e.get("via", "assistant") == "assistant"
         ]
         reply = result.get("reply") or ""
 
@@ -733,7 +749,8 @@ def api_assistant():
     # wins in the body, reply_channel_exfil in the reply text, and goal_hijack
     # by breaking the user's task. Four of the eight landing dev payloads have
     # nothing to do with recipients, so the page reported real hits as misses.
-    # evaluation/predicates.py is the same judge the research harness uses.
+    # evaluation/predicates.py is the same judge the research harness uses,
+    # applied to what was actually sent after the gate.
     payload_id = str(data.get("payload_id") or "").strip()
     if payload_id:
         result["verdict"] = _judge(payload_id, result)

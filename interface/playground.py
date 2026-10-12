@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agent.agent import Agent, ExtraTool
-from conditions import DEFAULT_DETECTION_THRESHOLD
+from conditions import DEFAULT_DETECTION_THRESHOLD, is_flagged
 from config import DOCUMENTS_DIR
 from mailsink import MailSink
 from rag.chunker import canonical_document_id
@@ -298,7 +298,7 @@ class _LiveRun:
     def _scan(self, chunk: TaggedChunk) -> dict[str, Any]:
         try:
             d = self.detector.scan(chunk)
-            flagged = d.failed or d.score >= DEFAULT_DETECTION_THRESHOLD
+            flagged = is_flagged(d, DEFAULT_DETECTION_THRESHOLD)
             return {"score": d.score, "label": d.label, "error": d.error, "flagged": flagged}
         except Exception as exc:  # noqa: BLE001
             # A detector that crashes is an outage; fail closed like the

@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from agent.llm import LLMProvider, LLMToolCall
+from agent.llm import LLMProvider, LLMToolCall, QuotaExhausted
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOL_SCHEMAS
 from mailsink import MailSink
@@ -102,10 +102,18 @@ class Agent:
                     out.proposed_calls.append(
                         ToolCall(call_id=call.id, tool_name=call.name, arguments=dict(call.input))
                     )
-                    results.append(self._execute(call, out, inject, inject_into))
+                    # The attacker edited one document once, so the payload lands
+                    # on the first search that returns that document and never
+                    # again. Decided here, where it persists across calls.
+                    pending = inject if out.poisoned_chunk_id is None else None
+                    results.append(self._execute(call, out, pending, inject_into))
                 messages.append({"role": "user", "content": results})
             else:
                 out.final_text = "(turn limit reached)"
+        except QuotaExhausted:
+            # Not one bad run: every run after it would fail the same way.
+            # Re-raised so the sweep stops with a log that can be resumed.
+            raise
         except Exception as exc:  # noqa: BLE001 - one bad run must not kill a sweep
             _log.exception("Agent run failed")
             out.error = f"{type(exc).__name__}: {exc}"
@@ -132,11 +140,10 @@ class Agent:
                 chunks, poisoned = self.retriever.search(
                     str(call.input.get("query", "")), inject=inject, inject_into=inject_into
                 )
-                # Only the first search carries the injection, matching an
-                # attacker who poisoned one document rather than the corpus.
+                # run() stops passing the payload once this is set. Rebinding
+                # `inject` here could not do that: it is only this call's copy.
                 if poisoned and out.poisoned_chunk_id is None:
                     out.poisoned_chunk_id = poisoned
-                    inject = None
                 out.chunks.extend(chunks)
                 content = "\n\n---\n\n".join(
                     f"[{c.chunk_id}] {c.text}" for c in chunks

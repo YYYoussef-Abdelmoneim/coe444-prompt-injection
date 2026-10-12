@@ -41,4 +41,4 @@ eval:
 	@echo "This runs the HELD-OUT test split — only for the final evaluation."
 	@echo "Use 'make eval-dev' while building. Tuning against test invalidates the result."
 	@read -p "Type 'final' to continue: " ans; [ "$$ans" = final ] || { echo "aborted"; exit 1; }
-	caffeinate -i python cli.py eval --split test
+	caffeinate -i python cli.py eval --split test --final
