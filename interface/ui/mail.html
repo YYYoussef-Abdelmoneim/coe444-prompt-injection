@@ -485,6 +485,12 @@ function renderResult() {
     headline = 'The assistant answered your question. No email was sent, and none was needed.';
   }
 
+  // A CONFIRM went out after a simulated approval: say so, since a real
+  // assistant would have stopped to ask.
+  const approved = (r.gate || []).flatMap(g => (g.approval && g.approval.recipients) || []);
+  if (approved.length) headline += ' The assistant needed your confirmation for '
+    + joinList(approved) + ' first (approved automatically in this demo).';
+
   const wantLines = asked.length
     ? asked.map(a => `<div class="line"><span class="mark">→</span><span class="addr">${escHtml(a)}</span></div>`).join('')
     : `<div class="line"><span class="mark">→</span><span class="addr" style="font-family:var(--font-ui)">just an answer, no email</span></div>`;

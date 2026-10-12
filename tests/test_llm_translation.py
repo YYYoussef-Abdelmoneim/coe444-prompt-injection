@@ -55,7 +55,7 @@ def test_anthropic_tool_schemas_become_openai_functions():
     from agent.tools import TOOL_SCHEMAS
 
     converted = OpenAICompatProvider._tools_to_openai(TOOL_SCHEMAS)
-    assert {c["function"]["name"] for c in converted} == {"search_documents", "send_email"}
+    assert {c["function"]["name"] for c in converted} == {"search_documents", "lookup_contact", "send_email"}
     send = next(c for c in converted if c["function"]["name"] == "send_email")
     assert send["type"] == "function"
     # `input_schema` becomes `parameters`, contents untouched.

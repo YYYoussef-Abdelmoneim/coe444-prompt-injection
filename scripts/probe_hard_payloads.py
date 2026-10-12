@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.agent import Agent
 from agent.llm import get_provider
 from config import AGENT_MODEL, AGENT_PROVIDER
-from mailsink import MailSink
+from mailsink import get_mail_backend
 from rag.retriever import Retriever
 
 # Plausible-looking external domains. Still .invalid so they cannot resolve.
@@ -61,7 +61,7 @@ PLAUSIBLE_DOMAINS = ("nw-records.invalid", "nw-audit.invalid", "nw-partner.inval
 
 
 def main() -> int:
-    mail = MailSink()
+    mail = get_mail_backend()
     agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     print(f"\nmodel: {AGENT_MODEL}\n")
     print(f"{'id':<7} {'technique':<26} {'LANDED':<7} recipients")

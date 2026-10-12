@@ -32,6 +32,11 @@ FIELD_CLASSES: dict[str, dict[str, FieldClass]] = {
     "search_documents": {
         "query": FieldClass.CONTENT,
     },
+    # A lookup only reads the directory and has no side effect, so its query is
+    # CONTENT. What it returns is stamped DIRECTORY (directory.py).
+    "lookup_contact": {
+        "query": FieldClass.CONTENT,
+    },
 }
 
 TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -46,6 +51,21 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "What to search for."}
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "lookup_contact",
+        "description": (
+            "Look up a colleague or team in the company directory by name or role "
+            "(for example 'my manager' or 'finance') and return their email address."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "The name or role to look up."}
             },
             "required": ["query"],
             "additionalProperties": False,

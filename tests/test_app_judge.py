@@ -53,3 +53,12 @@ def test_the_serialisers_accept_plain_strings_as_well_as_enums():
     out = decision_json(PolicyDecision("c1", "deny", "planted", [prov]))
     assert out["decision"] == "deny"
     assert out["field_provenance"][0]["violation"] is True
+
+
+def test_the_lab_shows_what_the_gate_stripped_and_what_it_asked_to_confirm():
+    from schema import Decision
+
+    out = decision_json(PolicyDecision("c1", Decision.CONFIRM, "simulated approval",
+                                       needs_confirmation=["hr@northwind.example"]))
+    assert out["confirmed"] is True
+    assert out["needs_confirmation"] == ["hr@northwind.example"] and out["stripped"] == []

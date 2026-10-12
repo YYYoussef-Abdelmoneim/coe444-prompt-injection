@@ -90,6 +90,11 @@ CEREBRAS_TOKENS_PER_MINUTE: int = int(os.getenv("CEREBRAS_TOKENS_PER_MINUTE", "2
 RATE_LIMIT_ATTEMPTS: int = int(os.getenv("RATE_LIMIT_ATTEMPTS", "4"))
 RATE_LIMIT_MAX_WAIT_S: float = float(os.getenv("RATE_LIMIT_MAX_WAIT_S", "65"))
 
+# ── Mail ──────────────────────────────────────────────────────────────────────
+# "simulated" is the in-memory MailSink, and the only backend this build has.
+# Containment: the corpus holds working attacks whose goal is to send mail.
+MAIL_BACKEND: str = os.getenv("MAIL_BACKEND", "simulated")
+
 # ── Retrieval ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 RETRIEVAL_K: int = int(os.getenv("RETRIEVAL_K", "4"))
@@ -110,6 +115,8 @@ RESULTS_DIR = Path(os.getenv("RESULTS_DIR", str(BASE_DIR / "results")))
 
 PAYLOADS_PATH = BASE_DIR / "attacks" / "payloads.json"
 BENIGN_PATH = BASE_DIR / "attacks" / "benign_tasks.json"
+# Tracked company data, not a heavy artefact: deliberately not under .data/.
+DIRECTORY_PATH = BASE_DIR / "data" / "directory.json"
 
 # ── Experiment identity ───────────────────────────────────────────────────────
 CORPUS_VERSION: str = os.getenv("CORPUS_VERSION", "v0.1-dev")

@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import json
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from config import MAIL_BACKEND
 
 _log = logging.getLogger(__name__)
 
@@ -28,8 +31,25 @@ class SentMessage:
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
-class MailSink:
-    """In-memory outbox. One instance per run; the runner reads it to score."""
+class MailBackend(ABC):
+    """Where send_email lands. The agent, the harness and the Mailbox depend on
+    this rather than on a concrete class, so a real backend (Gmail, after the
+    presentation) is one new subclass and one config value. The simulated sink
+    stays the default, and nothing in the evaluation may use another."""
+
+    outbox: list[SentMessage]
+
+    @abstractmethod
+    def send(
+        self, to: str, subject: str, body: str, cc: str | None = None, bcc: str | None = None
+    ) -> SentMessage: ...
+
+    @abstractmethod
+    def clear(self) -> None: ...
+
+
+class MailSink(MailBackend):
+    """In-memory outbox: the simulated backend. One instance per run."""
 
     def __init__(self) -> None:
         self.outbox: list[SentMessage] = []
@@ -51,3 +71,15 @@ class MailSink:
 
     def dump(self, path: Path) -> None:
         path.write_text(json.dumps([asdict(m) for m in self.outbox], indent=2), encoding="utf-8")
+
+
+_BACKENDS: dict[str, type[MailBackend]] = {"simulated": MailSink}
+
+
+def get_mail_backend(kind: str = MAIL_BACKEND) -> MailBackend:
+    try:
+        return _BACKENDS[kind]()
+    except KeyError:
+        raise ValueError(
+            f"unknown mail backend {kind!r}; this build has: {', '.join(sorted(_BACKENDS))}"
+        ) from None

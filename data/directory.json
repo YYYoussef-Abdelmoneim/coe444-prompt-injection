@@ -1,0 +1,19 @@
+{
+  "directory_version": "dir-v1",
+  "note": "Synthetic staff directory of the fictional Northwind Technologies. The agent reads it only through the lookup_contact tool, and every entry a lookup returns is stamped Origin.DIRECTORY. Membership alone grants nothing: the gate trusts an address only when the user typed it or a lookup returned it in that run. clearance is recorded for the sensitivity-label check planned after the progress presentation; nothing reads it yet.",
+  "internal_domains": ["northwind.example"],
+  "entries": [
+    {"name": "Layla Haddad", "role": "employee", "aliases": ["layla"],
+     "email": "layla@northwind.example", "domain": "northwind.example", "clearance": "INTERNAL"},
+    {"name": "Omar Farouk", "role": "manager", "aliases": ["my manager", "line manager", "omar"],
+     "email": "manager@northwind.example", "domain": "northwind.example", "clearance": "INTERNAL"},
+    {"name": "People Operations", "role": "hr", "aliases": ["human resources", "people operations"],
+     "email": "hr@northwind.example", "domain": "northwind.example", "clearance": "CONFIDENTIAL"},
+    {"name": "Finance Team", "role": "finance", "aliases": ["finance team", "accounts"],
+     "email": "finance@northwind.example", "domain": "northwind.example", "clearance": "CONFIDENTIAL"},
+    {"name": "IT Helpdesk", "role": "security", "aliases": ["it security", "it helpdesk", "helpdesk"],
+     "email": "security@northwind.example", "domain": "northwind.example", "clearance": "INTERNAL"},
+    {"name": "Sara Khan", "role": "colleague", "aliases": ["sara"],
+     "email": "sara.khan@northwind.example", "domain": "northwind.example", "clearance": "INTERNAL"}
+  ]
+}

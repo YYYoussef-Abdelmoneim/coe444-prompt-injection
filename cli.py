@@ -33,10 +33,10 @@ def cmd_ask(args: argparse.Namespace) -> int:
     from agent.agent import Agent
     from agent.llm import get_provider
     from config import AGENT_MODEL, AGENT_PROVIDER
-    from mailsink import MailSink
+    from mailsink import get_mail_backend
     from rag.retriever import Retriever
 
-    mail = MailSink()
+    mail = get_mail_backend()
     agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     run = agent.run(args.query)
     print(run.final_text or "(no text)")

@@ -20,13 +20,16 @@ from typing import Any, Callable
 from agent.llm import LLMProvider, LLMToolCall, QuotaExhausted
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOL_SCHEMAS
-from mailsink import MailSink
+from mailsink import MailBackend
 from rag.retriever import Retriever
 from schema import Origin, TaggedChunk, ToolCall
 
 _log = logging.getLogger(__name__)
 
-MAX_TURNS = 4
+# agent-v2: 6, was 4. A lookup adds a turn to every email that names its
+# recipient by role (search, lookup, send, reply), and a two-document question
+# (BN-060) ran out of turns at 4 with no defense running.
+MAX_TURNS = 6
 
 
 @dataclass
@@ -38,6 +41,8 @@ class AgentRun:
     poisoned_chunk_id: str | None = None
     proposed_calls: list[ToolCall] = field(default_factory=list)
     final_text: str = ""
+    # call_id -> len(chunks) when that call ran: what had been read before it.
+    context_at: dict[str, int] = field(default_factory=dict)
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
@@ -63,14 +68,19 @@ class Agent:
         self,
         provider: LLMProvider,
         retriever: Retriever,
-        mail: MailSink,
+        mail: MailBackend,
         *,
+        directory=None,
         extra_tools: list[ExtraTool] | None = None,
         system_prompt: str = SYSTEM_PROMPT,
     ) -> None:
         self.provider = provider
         self.retriever = retriever
         self.mail = mail
+        # Anything with search(query) -> list[TaggedChunk] stamped DIRECTORY.
+        # Loaded on first use, so an agent that never looks anyone up never
+        # reads the file.
+        self.directory = directory
         self.extra_tools = {t.schema["name"]: t for t in extra_tools or []}
         self.tool_schemas = TOOL_SCHEMAS + [t.schema for t in self.extra_tools.values()]
         self.system_prompt = system_prompt
@@ -106,6 +116,7 @@ class Agent:
                     # on the first search that returns that document and never
                     # again. Decided here, where it persists across calls.
                     pending = inject if out.poisoned_chunk_id is None else None
+                    out.context_at[call.id] = len(out.chunks)
                     results.append(self._execute(call, out, pending, inject_into))
                 messages.append({"role": "user", "content": results})
             else:
@@ -148,6 +159,16 @@ class Agent:
                 content = "\n\n---\n\n".join(
                     f"[{c.chunk_id}] {c.text}" for c in chunks
                 ) or "No matching documents."
+            elif call.name == "lookup_contact":
+                if self.directory is None:
+                    from directory import Directory
+
+                    self.directory = Directory.load()
+                chunks = self.directory.search(str(call.input.get("query", "")))
+                out.chunks.extend(chunks)
+                # A miss is plain text that never repeats the query: echoed
+                # back, an injected address would return stamped DIRECTORY.
+                content = "\n".join(c.text for c in chunks) or "No directory entry matches that name or role."
             elif call.name == "send_email":
                 msg = self.mail.send(
                     to=str(call.input.get("to", "")),

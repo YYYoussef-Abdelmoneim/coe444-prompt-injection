@@ -28,11 +28,15 @@ class Origin(str, Enum):
 
     Set STRUCTURALLY at ingestion, never inferred from content. `retriever.py`
     stamps EXTERNAL on everything it returns; the CLI stamps USER on what the
-    human typed. Nothing else is allowed to construct these.
+    human typed; `directory.py` stamps DIRECTORY on the entries lookup_contact
+    returns. Nothing else is allowed to construct these.
     """
 
     USER = "user"
     EXTERNAL = "external"
+    # A company directory entry returned by lookup_contact in this run. Trusted,
+    # but only for the address a lookup actually returned.
+    DIRECTORY = "directory"
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,12 @@ class Decision(str, Enum):
     ALLOW = "allow"
     # The call goes ahead with its externally-sourced recipients removed.
     SANITIZE = "sanitize"
+    # The call goes ahead as proposed once the user confirms the recipients in
+    # PolicyDecision.needs_confirmation: an outside address the user typed, or
+    # a company address seen only in retrieved content. The harness and the
+    # Mailbox have no human in the loop, so the approval is simulated and the
+    # call executes; scoring treats it like ALLOW.
+    CONFIRM = "confirm"
     DENY = "deny"
 
 
@@ -144,6 +154,11 @@ class PolicyDecision:
     reason: str
     field_provenance: list[FieldProvenance] = field(default_factory=list)
     sanitized_arguments: dict[str, Any] | None = None
+    # The recipient tokens the gate removed, and the addresses that go out only
+    # after the user confirms. Logged on every call, so a run shows exactly what
+    # the gate did; defaulted so older logs still load.
+    stripped: list[str] = field(default_factory=list)
+    needs_confirmation: list[str] = field(default_factory=list)
 
     @property
     def denied(self) -> bool:
@@ -152,6 +167,10 @@ class PolicyDecision:
     @property
     def sanitized(self) -> bool:
         return self.decision is Decision.SANITIZE
+
+    @property
+    def confirmed(self) -> bool:
+        return self.decision is Decision.CONFIRM
 
 
 # ── Outcome taxonomy ──────────────────────────────────────────────────────────
@@ -247,6 +266,10 @@ class RunRecord:
     # chunk carried the payload, and a detector can only be re-run offline on
     # text that was logged.
     chunks: list[TaggedChunk] = field(default_factory=list)
+    # call_id -> how many of `chunks` had been read before that call ran. The
+    # gate judges each call on that prefix only, so a lookup made after an
+    # email cannot vouch for the email's recipients.
+    context_at: dict[str, int] = field(default_factory=dict)
 
     @property
     def pairing_key(self) -> str:

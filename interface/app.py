@@ -129,12 +129,12 @@ def load_all():
             from agent.agent import Agent
             from agent.llm import get_provider
             from config import AGENT_MODEL, AGENT_PROVIDER
-            from mailsink import MailSink
+            from mailsink import get_mail_backend
 
             retriever = _cache.get("retriever")
             if retriever is None:
                 raise RuntimeError("retriever failed to load; agent needs it")
-            mail = MailSink()
+            mail = get_mail_backend()
             _cache["mail"] = mail
             _cache["agent"] = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), retriever, mail)
         except Exception as e:
@@ -150,12 +150,11 @@ def load_all():
 
     if "gate" not in _cache:
         try:
-            # The class is ProvenanceGate, and it needs the contact list or its
-            # decisions diverge from the CLI's (runner.py:63).
-            from attacks.loader import contacts
+            # Built exactly as the runner builds it, so the Lab and the CLI agree.
             from defense.prevention import ProvenanceGate
+            from directory import Directory
 
-            _cache["gate"] = ProvenanceGate(contacts=frozenset(contacts().values()))
+            _cache["gate"] = ProvenanceGate(internal_domains=Directory.load().internal_domains)
         except Exception as e:
             errors["gate"] = str(e)
 
@@ -242,6 +241,9 @@ def decision_json(d):
         # string never satisfies, so a string "deny" would display as allowed.
         "denied": decision == "deny",
         "sanitized": decision == "sanitize",
+        "confirmed": decision == "confirm",
+        "stripped": list(getattr(d, "stripped", None) or []),
+        "needs_confirmation": list(getattr(d, "needs_confirmation", None) or []),
         "sanitized_arguments": d.sanitized_arguments,
         "reason": d.reason,
         "field_provenance": prov,
@@ -559,25 +561,20 @@ def run_freeform(result, user_task, inject_into):
 
 def get_playground():
     if "playground" not in _cache:
-        from attacks.loader import contacts
         from interface.playground import Playground
 
-        _cache["playground"] = Playground(contacts())
+        _cache["playground"] = Playground()
     return _cache["playground"]
 
 
 def get_playground_gate():
-    """The team's gate, given the playground's address book.
-
-    The research gate only knows the corpus contacts. In the mailbox the user
-    also writes to colleagues like Sara, whose address appears in no prompt -
-    only in her own email - so without the directory every reply to her looks
-    like a recipient lifted from external content.
-    """
+    """The team's gate for the live Mailbox, built like the research one. It trusts
+    a colleague the agent looked up in this run (the Mailbox hands it the lookup)
+    and asks to confirm one whose address appears only in their own email."""
     if "playground_gate" not in _cache:
         from defense.prevention import ProvenanceGate
 
-        _cache["playground_gate"] = ProvenanceGate(contacts=get_playground().directory)
+        _cache["playground_gate"] = ProvenanceGate(internal_domains=get_playground().directory.internal_domains)
     return _cache["playground_gate"]
 
 
@@ -608,7 +605,7 @@ def api_mailbox():
             # from "the agent mailed an address an attacker planted" — without
             # it, replying to Sara (whose address appears only inside her own
             # email) looks identical to an injected recipient.
-            "contacts": sorted(box.directory),
+            "contacts": sorted(box.directory.addresses()),
             "defenses": _defense_status(),
             "models": {
                 "agent": f"{AGENT_MODEL} on {AGENT_PROVIDER}",

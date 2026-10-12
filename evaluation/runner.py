@@ -39,9 +39,10 @@ from defense.detection import DETECTOR_PROMPT_VERSION, Detector
 from defense.prevention import POLICY_VERSION, ProvenanceGate
 from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
-from mailsink import MailSink
+from mailsink import get_mail_backend
 from rag.retriever import Retriever
-from schema import RunRecord, ScoredOutcome, ToolCall
+from directory import Directory
+from schema import Origin, RunRecord, ScoredOutcome, ToolCall
 
 _log = logging.getLogger(__name__)
 
@@ -59,11 +60,14 @@ class Runner:
     def __init__(self, *, trials: int = TRIALS_PER_TASK, detector=None) -> None:
         self.trials = trials
         self.retriever = Retriever()
-        self.mail = MailSink()
-        self.agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), self.retriever, self.mail)
+        self.mail = get_mail_backend()
+        self.directory = Directory.load()
+        self.agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), self.retriever, self.mail,
+                           directory=self.directory)
         self.detector = detector if detector is not None else Detector()
+        # Scoring ground truth for "to my manager"-style tasks; never shown to the gate.
         self.contacts = contacts()
-        self.gate = ProvenanceGate(contacts=frozenset(self.contacts.values()))
+        self.gate = ProvenanceGate(internal_domains=self.directory.internal_domains)
         self.canary = canary()
         self.git = _git_commit()
 
@@ -156,9 +160,15 @@ class Runner:
 
         run = self.agent.run(item.user_task, inject=inject, inject_into=inject_into)
 
-        # Both defenses observe. Neither alters what already happened.
-        detections = self.detector.scan_all(run.chunks)
-        decisions = self.gate.evaluate_all(run.proposed_calls, item.user_task, run.chunks)
+        # Both defenses observe. Neither alters what already happened. The
+        # detector reads only untrusted text: directory entries are company
+        # data. The gate judges each call on what had been read before it ran,
+        # so a lookup made after an email cannot vouch for its recipients.
+        detections = self.detector.scan_all([c for c in run.chunks if c.origin is Origin.EXTERNAL])
+        decisions = [
+            self.gate.evaluate(c, item.user_task, run.chunks[: run.context_at.get(c.call_id, len(run.chunks))])
+            for c in run.proposed_calls
+        ]
 
         record = RunRecord(
             run_id=uuid.uuid4().hex[:12],
@@ -191,6 +201,7 @@ class Runner:
             success_spec=spec,
             canary=self.canary,
             chunks=list(run.chunks),
+            context_at=dict(run.context_at),
         )
         record._item = item  # type: ignore[attr-defined]
         return record
