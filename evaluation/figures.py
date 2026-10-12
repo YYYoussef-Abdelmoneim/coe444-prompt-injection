@@ -42,7 +42,7 @@ def _axes(title: str, subtitle: str, size=(7.2, 5.4)):
 
 def roc_figure(curves: list[dict], chosen: dict, out: Path, *, title: str, subtitle: str,
                target: tuple[float, float] | None = None) -> Path:
-    """curves: [{label, points: [(fpr, tpr)], auc}]; chosen: {fpr, tpr, label}."""
+    """curves: [{label, points: [(fpr, tpr)]}]; chosen: {fpr, tpr, label}."""
     fig, ax = _axes(title, subtitle)
     ax.plot([0, 1], [0, 1], color=AXIS, linewidth=1, solid_capstyle="round", zorder=1)
     ax.text(0.62, 0.55, "chance", color=MUTED, fontsize=8, rotation=37)
@@ -58,7 +58,7 @@ def roc_figure(curves: list[dict], chosen: dict, out: Path, *, title: str, subti
         # trapezoid AUC assumes; a step would contradict the number in the legend.
         xs, ys = zip(*sorted(set(c["points"])))
         ax.plot(xs, ys, color=SERIES[i], linewidth=2, solid_joinstyle="round", solid_capstyle="round",
-                label=f"{c['label']}, AUC {c['auc']:.2f}", zorder=3)
+                label=c["label"], zorder=3)
     ax.scatter([chosen["fpr"]], [chosen["tpr"]], s=64, color=SERIES[0], edgecolors=SURFACE,
                linewidths=2, zorder=4)
     ax.annotate(chosen["label"], (chosen["fpr"], chosen["tpr"]), xytext=(0.22, 0.9), textcoords="data",

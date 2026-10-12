@@ -207,7 +207,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_det = sub.add_parser("detector-eval", help="score the fixed dev excerpt set (Cerebras)")
     p_det.add_argument("--baseline-log", default="logs/run-20260927T082229Z.jsonl",
                        help="dev run log that records each payload's host chunk")
+    p_det.add_argument("--external", action="store_true",
+                       help="the pre-registered out-of-sample check instead of the dev set")
+    p_det.add_argument("--llmail-log", default="logs/run-20261012T202019Z.jsonl")
+    p_det.add_argument("--fp-emails", default=".data/llmail_inject/1063bdf/emails_for_fp_tests.json")
+    p_det.add_argument("--dev-log", default="logs/detector-20261012T203528Z.jsonl")
+    p_det.add_argument("--out-dir", default="results")
     p_det.set_defaults(fn=cmd_detector_eval)
+
+    p_var = sub.add_parser("detector-variance", help="repeat uncached calls near the threshold (Cerebras)")
+    p_var.add_argument("--dev-log", default="logs/detector-20261012T203528Z.jsonl")
+    p_var.add_argument("--baseline-log", default="logs/run-20260927T082229Z.jsonl")
+    p_var.add_argument("--repeats", type=int, default=3)
+    p_var.add_argument("--out-dir", default="results")
+    p_var.set_defaults(fn=cmd_detector_variance)
 
     p_roc = sub.add_parser("roc", help="ROC, AUC and the dev threshold from a detector log")
     p_roc.add_argument("detector_log")
@@ -230,9 +243,18 @@ def cmd_detector_eval(args: argparse.Namespace) -> int:
     from defense.verdict_cache import VerdictCache
     from evaluation.detector_eval import dev_excerpts, score_excerpts, summary, write_log
 
-    excerpts = dev_excerpts(Path(args.baseline_log))
+    if args.external:
+        # The pre-registered out-of-sample check (results/methodology_draft.md):
+        # the frozen detector, never re-chosen afterwards.
+        from evaluation.detector_eval import external_excerpts
+
+        excerpts = external_excerpts(Path(args.llmail_log), Path(args.fp_emails))
+        prefix = "detector-external"
+    else:
+        excerpts = dev_excerpts(Path(args.baseline_log))
+        prefix = "detector"
     poisoned = sum(e.kind == "poisoned" for e in excerpts)
-    print(f"{len(excerpts)} dev excerpts: {len(excerpts) - poisoned} clean, {poisoned} poisoned; "
+    print(f"{len(excerpts)} excerpts: {len(excerpts) - poisoned} clean, {poisoned} poisoned; "
           f"detector {DETECTOR_PROMPT_VERSION}\n")
     try:
         rows = score_excerpts(excerpts, Detector(cache=VerdictCache(DETECTOR_CACHE_PATH)),
@@ -241,10 +263,41 @@ def cmd_detector_eval(args: argparse.Namespace) -> int:
         print(f"\nSTOPPED, free-tier limit: {exc}\nVerdicts so far are cached; run this again later.")
         return 3
     rows += score_excerpts(excerpts, KeywordDetector(), name="keyword", version=BASELINE_VERSION)
-    path = LOG_DIR / f"detector-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    path = LOG_DIR / f"{prefix}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     write_log(rows, path)
     print(f"\nwrote {len(rows)} verdicts to {path}\n")
     print(summary(rows))
+    if args.external:
+        from evaluation.detector_eval import load_log, write_outofsample_report
+
+        out = write_outofsample_report(rows, load_log(Path(args.dev_log)), path, Path(args.out_dir))
+        print(f"\nwrote {out}")
+    return 0
+
+
+def cmd_detector_variance(args: argparse.Namespace) -> int:
+    """Repeat uncached calls on the excerpts nearest the threshold (pre-registered)."""
+    from datetime import datetime, timezone
+
+    from agent.llm import QuotaExhausted
+    from config import LOG_DIR
+    from defense.detection import DETECTOR_PROMPT_VERSION, Detector
+    from evaluation.detector_eval import (dev_excerpts, load_log, run_variance, variance_targets,
+                                          write_log, write_variance_report)
+
+    dev_rows = [r for r in load_log(Path(args.dev_log)) if r["detector"] == "llm"]
+    targets = variance_targets(dev_rows, dev_excerpts(Path(args.baseline_log)))
+    print(f"{len(targets)} excerpts x {args.repeats} uncached calls: {', '.join(t.excerpt_id for t in targets)}\n")
+    try:
+        rows = run_variance(targets, Detector(), version=DETECTOR_PROMPT_VERSION, repeats=args.repeats)
+    except QuotaExhausted as exc:
+        print(f"\nSTOPPED, free-tier limit: {exc}")
+        return 3
+    path = LOG_DIR / f"detector-variance-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    write_log(rows, path)
+    out = write_variance_report(rows, dev_rows, path, Path(args.out_dir))
+    print(f"\nwrote {path} and {out}")
+    print(out.read_text())
     return 0
 
 
