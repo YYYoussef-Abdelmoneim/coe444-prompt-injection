@@ -28,11 +28,15 @@ class Origin(str, Enum):
 
     Set STRUCTURALLY at ingestion, never inferred from content. `retriever.py`
     stamps EXTERNAL on everything it returns; the CLI stamps USER on what the
-    human typed. Nothing else is allowed to construct these.
+    human typed; `directory.py` stamps DIRECTORY on the entries lookup_contact
+    returns. Nothing else is allowed to construct these.
     """
 
     USER = "user"
     EXTERNAL = "external"
+    # A company directory entry returned by lookup_contact in this run. Trusted,
+    # but only for the address a lookup actually returned.
+    DIRECTORY = "directory"
 
 
 @dataclass(frozen=True)
@@ -247,6 +251,10 @@ class RunRecord:
     # chunk carried the payload, and a detector can only be re-run offline on
     # text that was logged.
     chunks: list[TaggedChunk] = field(default_factory=list)
+    # call_id -> how many of `chunks` had been read before that call ran. The
+    # gate judges each call on that prefix only, so a lookup made after an
+    # email cannot vouch for the email's recipients.
+    context_at: dict[str, int] = field(default_factory=dict)
 
     @property
     def pairing_key(self) -> str:

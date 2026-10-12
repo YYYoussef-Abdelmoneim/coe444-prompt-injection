@@ -115,6 +115,8 @@ RESULTS_DIR = Path(os.getenv("RESULTS_DIR", str(BASE_DIR / "results")))
 
 PAYLOADS_PATH = BASE_DIR / "attacks" / "payloads.json"
 BENIGN_PATH = BASE_DIR / "attacks" / "benign_tasks.json"
+# Tracked company data, not a heavy artefact: deliberately not under .data/.
+DIRECTORY_PATH = BASE_DIR / "data" / "directory.json"
 
 # ── Experiment identity ───────────────────────────────────────────────────────
 CORPUS_VERSION: str = os.getenv("CORPUS_VERSION", "v0.1-dev")

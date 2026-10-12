@@ -559,10 +559,9 @@ def run_freeform(result, user_task, inject_into):
 
 def get_playground():
     if "playground" not in _cache:
-        from attacks.loader import contacts
         from interface.playground import Playground
 
-        _cache["playground"] = Playground(contacts())
+        _cache["playground"] = Playground()
     return _cache["playground"]
 
 
@@ -577,7 +576,7 @@ def get_playground_gate():
     if "playground_gate" not in _cache:
         from defense.prevention import ProvenanceGate
 
-        _cache["playground_gate"] = ProvenanceGate(contacts=get_playground().directory)
+        _cache["playground_gate"] = ProvenanceGate(contacts=get_playground().directory.addresses())
     return _cache["playground_gate"]
 
 
@@ -608,7 +607,7 @@ def api_mailbox():
             # from "the agent mailed an address an attacker planted" — without
             # it, replying to Sara (whose address appears only inside her own
             # email) looks identical to an injected recipient.
-            "contacts": sorted(box.directory),
+            "contacts": sorted(box.directory.addresses()),
             "defenses": _defense_status(),
             "models": {
                 "agent": f"{AGENT_MODEL} on {AGENT_PROVIDER}",
