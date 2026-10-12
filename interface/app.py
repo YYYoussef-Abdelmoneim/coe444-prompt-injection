@@ -129,12 +129,12 @@ def load_all():
             from agent.agent import Agent
             from agent.llm import get_provider
             from config import AGENT_MODEL, AGENT_PROVIDER
-            from mailsink import MailSink
+            from mailsink import get_mail_backend
 
             retriever = _cache.get("retriever")
             if retriever is None:
                 raise RuntimeError("retriever failed to load; agent needs it")
-            mail = MailSink()
+            mail = get_mail_backend()
             _cache["mail"] = mail
             _cache["agent"] = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), retriever, mail)
         except Exception as e:

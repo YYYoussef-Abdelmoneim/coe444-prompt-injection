@@ -32,7 +32,7 @@ from typing import Any
 from agent.agent import Agent, ExtraTool
 from conditions import DEFAULT_DETECTION_THRESHOLD, is_flagged
 from config import DOCUMENTS_DIR
-from mailsink import MailSink
+from mailsink import MailBackend, get_mail_backend
 from rag.chunker import canonical_document_id
 from schema import Origin, TaggedChunk, ToolCall
 
@@ -291,7 +291,7 @@ class _LiveRun:
         self.gate_log: list[dict[str, Any]] = []
         self.seen: list[TaggedChunk] = []
         self.planted: dict[str, str] = {}
-        self.sink = MailSink()
+        self.sink = get_mail_backend()
         self.mail = _LiveMail(self)
         self._pending: list[dict[str, Any]] = []
 
@@ -367,12 +367,20 @@ class _LiveRetriever:
         return self.run.screen(edited, "document"), planted_id
 
 
-class _LiveMail:
-    """Prevention's live slot: every email the agent sends passes here first."""
+class _LiveMail(MailBackend):
+    """Prevention's live slot: every email the agent sends passes here first,
+    then lands in the run's own backend."""
 
     def __init__(self, run: _LiveRun) -> None:
         self.run = run
         self._n = itertools.count(1)
+
+    @property
+    def outbox(self):
+        return self.run.sink.outbox
+
+    def clear(self) -> None:
+        self.run.sink.clear()
 
     def send(self, to: str, subject: str, body: str, cc: str | None = None, bcc: str | None = None):
         run = self.run

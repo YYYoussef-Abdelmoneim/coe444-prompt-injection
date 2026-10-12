@@ -20,7 +20,7 @@ from typing import Any, Callable
 from agent.llm import LLMProvider, LLMToolCall, QuotaExhausted
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOL_SCHEMAS
-from mailsink import MailSink
+from mailsink import MailBackend
 from rag.retriever import Retriever
 from schema import Origin, TaggedChunk, ToolCall
 
@@ -63,7 +63,7 @@ class Agent:
         self,
         provider: LLMProvider,
         retriever: Retriever,
-        mail: MailSink,
+        mail: MailBackend,
         *,
         extra_tools: list[ExtraTool] | None = None,
         system_prompt: str = SYSTEM_PROMPT,

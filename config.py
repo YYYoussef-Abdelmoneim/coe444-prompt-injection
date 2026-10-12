@@ -90,6 +90,11 @@ CEREBRAS_TOKENS_PER_MINUTE: int = int(os.getenv("CEREBRAS_TOKENS_PER_MINUTE", "2
 RATE_LIMIT_ATTEMPTS: int = int(os.getenv("RATE_LIMIT_ATTEMPTS", "4"))
 RATE_LIMIT_MAX_WAIT_S: float = float(os.getenv("RATE_LIMIT_MAX_WAIT_S", "65"))
 
+# ── Mail ──────────────────────────────────────────────────────────────────────
+# "simulated" is the in-memory MailSink, and the only backend this build has.
+# Containment: the corpus holds working attacks whose goal is to send mail.
+MAIL_BACKEND: str = os.getenv("MAIL_BACKEND", "simulated")
+
 # ── Retrieval ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 RETRIEVAL_K: int = int(os.getenv("RETRIEVAL_K", "4"))

@@ -39,7 +39,7 @@ from defense.detection import DETECTOR_PROMPT_VERSION, Detector
 from defense.prevention import POLICY_VERSION, ProvenanceGate
 from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
-from mailsink import MailSink
+from mailsink import get_mail_backend
 from rag.retriever import Retriever
 from schema import RunRecord, ScoredOutcome, ToolCall
 
@@ -59,7 +59,7 @@ class Runner:
     def __init__(self, *, trials: int = TRIALS_PER_TASK, detector=None) -> None:
         self.trials = trials
         self.retriever = Retriever()
-        self.mail = MailSink()
+        self.mail = get_mail_backend()
         self.agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), self.retriever, self.mail)
         self.detector = detector if detector is not None else Detector()
         self.contacts = contacts()

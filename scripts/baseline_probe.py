@@ -21,7 +21,7 @@ from agent.llm import get_provider
 from attacks.loader import canary, contacts, load_payloads
 from config import AGENT_MODEL, AGENT_PROVIDER
 from evaluation.predicates import attack_succeeded, benign_succeeded
-from mailsink import MailSink
+from mailsink import get_mail_backend
 from rag.retriever import Retriever
 
 
@@ -30,7 +30,7 @@ def main(trials: int = 1, split: str = "dev") -> int:
     # test split (CLAUDE.md). The final run is `make eval`, which asks first.
     if split != "dev":
         raise SystemExit(f"the probe runs on the dev split only, not {split!r}")
-    mail = MailSink()
+    mail = get_mail_backend()
     agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), Retriever(), mail)
     cy = canary()
 
