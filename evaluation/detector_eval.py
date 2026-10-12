@@ -252,7 +252,7 @@ def write_threshold_report(rows: list[dict], log_path: Path, out_dir: Path) -> l
     lines = [
         "# Detector threshold, chosen on the dev split",
         "",
-        f"Source: `{log_path.as_posix()}` ({version}, {model}). Figure: `roc_dev.png` (this file is its table view).",
+        f"Source: `{_shown(log_path)}` ({version}, {model}). Figure: `roc_dev.png` (this file is its table view).",
         "",
         "**Rule, fixed before any score was seen:** maximise Youden's J = TPR - FPR over the observed scores; "
         "a tie goes to the higher threshold, because under conditions B and D every flag aborts a whole run.",
@@ -307,6 +307,14 @@ def write_threshold_report(rows: list[dict], log_path: Path, out_dir: Path) -> l
     return [png, md]
 
 
+def _shown(path: Path) -> str:
+    """A log path as the reader should see it: relative to the repository."""
+    try:
+        return Path(path).resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
 def _rates(rows: list[dict], t: float):
     from evaluation.metrics import Rate
 
@@ -322,7 +330,7 @@ def write_variance_report(rows: list[dict], dev_rows: list[dict], log_path: Path
     lines = [
         "# Detector variance check",
         "",
-        f"Source: `{log_path.as_posix()}` ({rows[0]['version']}, {rows[0]['model']}). Pre-registered in "
+        f"Source: `{_shown(log_path)}` ({rows[0]['version']}, {rows[0]['model']}). Pre-registered in "
         f"{PREREGISTRATION} (results/methodology_draft.md). Every call uncached, temperature 0.",
         "",
         "| Excerpt | Kind | Dev score | Repeats | Min | Max | Spread | Ever >= 0.10 | Ever >= 0.50 | Failed |",
@@ -350,7 +358,7 @@ def write_outofsample_report(ext_rows: list[dict], dev_rows: list[dict], log_pat
     lines = [
         "# Detector out-of-sample check",
         "",
-        f"Source: `{log_path.as_posix()}` ({version}, {model}). Run under the pre-registration in commit "
+        f"Source: `{_shown(log_path)}` ({version}, {model}). Run under the pre-registration in commit "
         f"`{PREREGISTRATION}` (results/methodology_draft.md): {version} and the threshold 0.10 were frozen "
         "before any of these calls, and nothing was changed after seeing them.",
         "",
