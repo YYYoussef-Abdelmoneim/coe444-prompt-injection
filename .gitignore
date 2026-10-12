@@ -17,6 +17,7 @@ logs/*.jsonl
 !logs/scored-20261012T202019Z.jsonl
 # Pre-registered detector checks (Step E): the variance check and the out-of-sample run.
 !logs/detector-variance-20261012T211059Z.jsonl
+!logs/detector-external-20261012T215514Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store
