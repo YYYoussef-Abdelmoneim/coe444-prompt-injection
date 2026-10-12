@@ -75,6 +75,21 @@ SAMPLING: str = f"temperature={AGENT_TEMPERATURE} (openai-compatible endpoint)"
 AGENT_MAX_TOKENS: int = int(os.getenv("AGENT_MAX_TOKENS", "2048"))
 DETECTOR_MAX_TOKENS: int = int(os.getenv("DETECTOR_MAX_TOKENS", "256"))
 
+# ── Free-tier pacing ──────────────────────────────────────────────────────────
+# The budget is $0, so requests are spaced on our side to stay under the free
+# tiers rather than leaning on 429s. Published limits, Oct 2026: Groq
+# gpt-oss-20b 30 RPM / 8K TPM / 200K TPD; Cerebras gpt-oss-120b 5 RPM (token
+# bucket). A per-minute 429 still waits out its retry-after, at most
+# RATE_LIMIT_ATTEMPTS times; a daily limit, a 402, a retry-after longer than
+# RATE_LIMIT_MAX_WAIT_S, or a 429 that persists raises QuotaExhausted, which
+# stops a sweep with a log that `cli.py eval --resume` continues.
+GROQ_MIN_INTERVAL_S: float = float(os.getenv("GROQ_MIN_INTERVAL_S", "2.0"))
+GROQ_TOKENS_PER_MINUTE: int = int(os.getenv("GROQ_TOKENS_PER_MINUTE", "7000"))
+CEREBRAS_MIN_INTERVAL_S: float = float(os.getenv("CEREBRAS_MIN_INTERVAL_S", "12.5"))
+CEREBRAS_TOKENS_PER_MINUTE: int = int(os.getenv("CEREBRAS_TOKENS_PER_MINUTE", "25000"))
+RATE_LIMIT_ATTEMPTS: int = int(os.getenv("RATE_LIMIT_ATTEMPTS", "4"))
+RATE_LIMIT_MAX_WAIT_S: float = float(os.getenv("RATE_LIMIT_MAX_WAIT_S", "65"))
+
 # ── Retrieval ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 RETRIEVAL_K: int = int(os.getenv("RETRIEVAL_K", "4"))

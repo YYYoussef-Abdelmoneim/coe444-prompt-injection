@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from agent.llm import LLMProvider, LLMToolCall
+from agent.llm import LLMProvider, LLMToolCall, QuotaExhausted
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOL_SCHEMAS
 from mailsink import MailSink
@@ -110,6 +110,10 @@ class Agent:
                 messages.append({"role": "user", "content": results})
             else:
                 out.final_text = "(turn limit reached)"
+        except QuotaExhausted:
+            # Not one bad run: every run after it would fail the same way.
+            # Re-raised so the sweep stops with a log that can be resumed.
+            raise
         except Exception as exc:  # noqa: BLE001 - one bad run must not kill a sweep
             _log.exception("Agent run failed")
             out.error = f"{type(exc).__name__}: {exc}"

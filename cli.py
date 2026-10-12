@@ -4,6 +4,7 @@
   python cli.py ask "..."                one query, no attack
   python cli.py demo PI-101              show one payload under all four conditions
   python cli.py eval [--only ID,...]     run the dev split and print the results table
+  python cli.py eval --resume <run.jsonl>   continue a sweep stopped by a free-tier limit
   python cli.py eval --split test --final   the held-out split, once, at the end (make eval)
   python cli.py report <scored.jsonl>    recompute metrics from an existing log
   python cli.py rescore <run.jsonl> [--threshold t] [--write]
@@ -105,10 +106,14 @@ def cmd_eval(args: argparse.Namespace) -> int:
             print(f"--only takes dev ids; not in the dev split: {', '.join(unknown)}")
             return 2
 
+    from agent.llm import QuotaExhausted
     from evaluation.runner import Runner
 
     runner = Runner(trials=args.trials)
-    records, outcomes = runner.run_all(split=args.split, only=only)
+    try:
+        records, outcomes = runner.run_all(split=args.split, only=only, resume=args.resume)
+    except QuotaExhausted:
+        return 3  # run_all has said where the partial log is and how to resume
     print()
     print(summary_table(outcomes, records=records))
     return 0
@@ -180,6 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval.add_argument("--final", action="store_true",
                         help="required with --split test: this is the single final run")
     p_eval.add_argument("--only", default=None, help="comma-separated dev ids, for smoke runs")
+    p_eval.add_argument("--resume", default=None, metavar="RUN_LOG",
+                        help="continue a sweep that stopped on a free-tier limit, in the same log")
     p_eval.add_argument("--trials", type=int, default=3)
     p_eval.set_defaults(fn=cmd_eval)
 

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent.agent import Agent
-from agent.llm import get_provider
+from agent.llm import QuotaExhausted, get_provider
 from agent.prompts import SYSTEM_PROMPT_VERSION
 from attacks.loader import BenignTask, Payload, canary, contacts, load_benign, load_payloads
 from conditions import ALL_CONDITIONS, DEFAULT_DETECTION_THRESHOLD, any_flagged, score
@@ -37,6 +37,7 @@ from config import (
 )
 from defense.detection import DETECTOR_PROMPT_VERSION, Detector
 from defense.prevention import POLICY_VERSION, ProvenanceGate
+from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
 from mailsink import MailSink
 from rag.retriever import Retriever
@@ -67,7 +68,11 @@ class Runner:
         self.git = _git_commit()
 
     def run_all(
-        self, split: str = "dev", *, only: set[str] | None = None
+        self,
+        split: str = "dev",
+        *,
+        only: set[str] | None = None,
+        resume: Path | str | None = None,
     ) -> tuple[list[RunRecord], list[ScoredOutcome]]:
         """Execute every task, then score. Writes incrementally.
 
@@ -75,6 +80,11 @@ class Runner:
         A sweep is minutes of API calls, and losing all of it to a crash, an
         unplugged drive or a rate limit on the last task is not acceptable - a
         partial log is still analysable.
+
+        A free-tier limit (QuotaExhausted) stops the sweep before the failed run
+        is written, so the log holds only complete runs. `resume` continues such
+        a log in place, skipping the (task, trial) pairs it already holds; the
+        sweep is scored once, when it is complete.
         """
         items: list[tuple[Payload | BenignTask, bool]] = [
             (p, True) for p in load_payloads(split)
@@ -87,24 +97,42 @@ class Runner:
             self._success_spec(item, is_attack)
         total = len(items) * self.trials
 
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        raw_path = LOG_DIR / f"run-{stamp}.jsonl"
-        records: list[RunRecord] = []
-        done = 0
+        if resume is not None:
+            raw_path = Path(resume)
+            records = load_records(raw_path)
+            _check_resumable(records, split, raw_path)
+            stamp = raw_path.stem.removeprefix("run-")
+            mode = "a"
+        else:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            raw_path = LOG_DIR / f"run-{stamp}.jsonl"
+            records = []
+            mode = "w"
+        finished = {(r.task_id, r.trial) for r in records}
 
-        with raw_path.open("w", encoding="utf-8") as fh:
+        n = 0
+        with raw_path.open(mode, encoding="utf-8") as fh:
             for item, is_attack in items:
                 for trial in range(1, self.trials + 1):
-                    done += 1
-                    print(f"  [{done:>3}/{total}] {item.id} trial {trial}", flush=True)
-                    rec = self._one(item, trial, is_attack=is_attack)
+                    n += 1
+                    if (item.id, trial) in finished:
+                        continue
+                    print(f"  [{n:>3}/{total}] {item.id} trial {trial}", flush=True)
+                    try:
+                        rec = self._one(item, trial, is_attack=is_attack)
+                    except QuotaExhausted as exc:
+                        print(f"\n  STOPPED, free-tier limit: {exc}\n"
+                              f"  {len(records)} of {total} runs are in {raw_path}.\n"
+                              f"  Continue later: python cli.py eval --split {split} --resume {raw_path}",
+                              flush=True)
+                        raise
                     if rec.error:
                         print(f"        error: {rec.error}", flush=True)
                     records.append(rec)
                     fh.write(rec.to_json() + "\n")
                     fh.flush()
 
-        print(f"  wrote {len(records)} records to {raw_path}", flush=True)
+        print(f"  {len(records)} records in {raw_path}", flush=True)
         outcomes = self.score_all(records)
         self._write_scored(outcomes, stamp)
         return records, outcomes
@@ -176,6 +204,28 @@ class Runner:
         out_path = LOG_DIR / f"scored-{stamp}.jsonl"
         write_scored(outcomes, out_path)
         print(f"  wrote {len(outcomes)} scored outcomes to {out_path}", flush=True)
+
+
+def _check_resumable(records: list[RunRecord], split: str, path: Path) -> None:
+    """A resumed sweep must be one experiment: same corpus, prompts, gate,
+    models and sampling as the runs already in the log, and the same split."""
+    current = {
+        "corpus_version": CORPUS_VERSION,
+        "detector_prompt_version": f"{DETECTOR_PROMPT_VERSION}+{SYSTEM_PROMPT_VERSION}",
+        "policy_version": POLICY_VERSION,
+        "agent_model": AGENT_MODEL,
+        "detector_model": DETECTOR_MODEL,
+        "sampling": SAMPLING,
+    }
+    for rec in records:
+        for name, now in current.items():
+            if getattr(rec, name) != now:
+                raise ValueError(
+                    f"cannot resume {path}: run {rec.run_id} has {name}={getattr(rec, name)!r}, "
+                    f"this code has {now!r}. Start a new sweep instead."
+                )
+        if rec.split and rec.split != split:
+            raise ValueError(f"cannot resume {path}: it holds {rec.split!r} runs, not {split!r}")
 
 
 def score_records(
