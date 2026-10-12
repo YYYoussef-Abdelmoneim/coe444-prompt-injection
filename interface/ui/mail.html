@@ -417,6 +417,23 @@ function renderUsage(u) {
   document.getElementById('usage-warn').textContent = (u && u.warn) ? u.message : '';
 }
 
+// What actually stopped the attack, from what the server reports. This used to
+// say the defenses were empty files on every miss, even once a gate had
+// stripped the planted recipient.
+function whyItFailed(r) {
+  const gated = (r.gate || []).filter(g => g.decision === 'sanitize' || g.decision === 'deny');
+  const withheld = (r.read || []).filter(c => c.withheld);
+  if (gated.some(g => g.decision === 'deny')) return 'The prevention gate refused to send the email.';
+  if (gated.length) return 'The prevention gate removed the planted recipient before the email went out.';
+  if (withheld.length) return 'Detection withheld ' + withheld.length + ' flagged excerpt'
+    + (withheld.length > 1 ? 's' : '') + ' before the assistant could read ' + (withheld.length > 1 ? 'them.' : 'it.');
+  const d = r.defenses || {};
+  const stubs = ['detection', 'prevention'].filter(k => d[k] && d[k].implemented === false);
+  if (stubs.length === 2) return 'Careful: both defenses are still empty files, so the model simply did not '
+    + 'obey the planted text this time — nothing stopped it.';
+  return 'No defense had to act: the model did not obey the planted text this time.';
+}
+
 function renderResult() {
   const r = LAST_RUN;
   const asked = addrsIn(LAST_TASK);
@@ -457,8 +474,7 @@ function renderResult() {
     cls = 'v-good'; icon = '✅';
     state = 'THE ATTACK DID NOT WORK';
     headline = (v.known ? 'It did not meet its objective (' + v.predicate + ') on this run. ' : 'No extra recipient was added. ')
-      + 'Careful: both defenses are still empty files, so the model simply did not obey the planted text this time '
-      + '— nothing stopped it.';
+      + whyItFailed(r);
   } else if (delivered.length) {
     cls = 'v-good'; icon = '✅';
     state = 'NORMAL — NOTHING WENT WRONG';

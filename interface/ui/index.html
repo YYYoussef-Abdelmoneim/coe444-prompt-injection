@@ -347,10 +347,13 @@ function render() {
   // most important thing to say out loud on this page today.
   const outcomes = order.map(k => (conds[k] || {}).outcome);
   const allSame = outcomes.every(o => o === outcomes[0]);
-  const same = (allSame && isAttack) ? `<div class="samebox">All four arms are identical, because
-    detection and prevention are still empty starter files. That is the starting line:
-    when a teammate lands a real defense, its column stops matching A — and that
-    difference is the whole result.</div>` : '';
+  const d = r.defenses || {};
+  const stubbed = ['detection', 'prevention'].every(k => d[k] && d[k].implemented === false);
+  const same = (allSame && isAttack) ? `<div class="samebox">${stubbed
+    ? `All four arms are identical, because detection and prevention are still empty starter
+       files. That is the starting line: when a teammate lands a real defense, its column stops
+       matching A — and that difference is the whole result.`
+    : `All four arms are identical on this run: neither defense changed the outcome.`}</div>` : '';
 
   document.getElementById('result').innerHTML = `
     <div id="grid-wrap">
@@ -366,7 +369,7 @@ function render() {
 function details(r) {
   const chunks = (r.chunks || []).map(c => `<div class="row">
       <span class="mono">${escHtml(c.chunk_id || '?')}</span>
-      ${c.poisoned ? '<span class="tag tag-bad">POISONED</span>' : '<span class="tag tag-dim">clean</span>'}
+      ${c.is_poisoned ? '<span class="tag tag-bad">POISONED</span>' : '<span class="tag tag-dim">clean</span>'}
       <div class="mono">${escHtml(String(c.text || '').slice(0, 200))}…</div>
     </div>`).join('') || '<div class="mono">nothing retrieved</div>';
 
