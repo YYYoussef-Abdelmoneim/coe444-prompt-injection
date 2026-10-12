@@ -206,6 +206,7 @@ class Runner:
             canary=self.canary,
             chunks=list(run.chunks),
             context_at=dict(run.context_at),
+            turns=run.turns,
         )
         record._item = item  # type: ignore[attr-defined]
         return record

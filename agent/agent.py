@@ -43,6 +43,9 @@ class AgentRun:
     final_text: str = ""
     # call_id -> len(chunks) when that call ran: what had been read before it.
     context_at: dict[str, int] = field(default_factory=dict)
+    # Model turns used, so a report can tell a finished run from one that hit
+    # MAX_TURNS. Telemetry only.
+    turns: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
@@ -98,6 +101,7 @@ class Agent:
 
         try:
             for _ in range(MAX_TURNS):
+                out.turns += 1
                 resp = self.provider.generate(messages, self.tool_schemas, self.system_prompt)
                 out.input_tokens += resp.input_tokens
                 out.output_tokens += resp.output_tokens
