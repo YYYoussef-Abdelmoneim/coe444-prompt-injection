@@ -5,6 +5,8 @@
   python cli.py demo PI-101              show one payload under all four conditions
   python cli.py eval [--split test]      run the corpus and print the results table
   python cli.py report <scored.jsonl>    recompute metrics from an existing log
+  python cli.py rescore <run.jsonl> [--threshold t] [--write]
+                                         re-score a raw run log, no API call
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
 def cmd_demo(args: argparse.Namespace) -> int:
     """The presentation demo: one attack, all four conditions, side by side."""
     from attacks.loader import canary, contacts, load_payloads
-    from conditions import ALL_CONDITIONS
+    from conditions import ALL_CONDITIONS, DEFAULT_DETECTION_THRESHOLD, is_flagged
     from evaluation.runner import Runner
 
     payloads = {p.id: p for p in load_payloads()}
@@ -67,7 +69,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print(f"  retrieved: {', '.join(record.retrieved_chunk_ids)}")
     print(f"  poisoned chunk: {record.poisoned_chunk_id}  (retrieval_hit={record.retrieval_hit})")
     for d in record.detections:
-        mark = "FLAG" if d.score >= 0.5 else "ok  "
+        mark = "FLAG" if is_flagged(d, DEFAULT_DETECTION_THRESHOLD) else "ok  "
         print(f"    detector {mark} {d.score:.2f}  {d.chunk_id}")
     for c in record.proposed_calls:
         print(f"  proposed: {c.tool_name}({json.dumps(c.arguments)[:110]})")
@@ -110,6 +112,34 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rescore(args: argparse.Namespace) -> int:
+    """Score a raw run log under all four conditions at any detection threshold.
+
+    The log is the evidence (invariant 5), so this needs no API call and never
+    re-runs the agent. --write saves the table's rows next to the log, under a
+    name that says which threshold made them; an existing file is never replaced.
+    """
+    from attacks.loader import canary, contacts
+    from evaluation.logs import load_records
+    from evaluation.metrics import summary_table
+    from evaluation.runner import rescored_path, score_records, write_scored
+
+    run_log = Path(args.run_log)
+    records = load_records(run_log)
+    outcomes = score_records(records, canary=canary(), contacts=contacts(), threshold=args.threshold)
+    print(f"{len(records)} records from {run_log}, detection threshold {args.threshold}\n")
+    print(summary_table(outcomes, records=records))
+    if args.write:
+        out = Path(args.out) if args.out else rescored_path(run_log, args.threshold)
+        try:
+            write_scored(outcomes, out)
+        except FileExistsError:
+            print(f"\n{out} already exists; not overwriting it. Pass --out to choose another name.")
+            return 1
+        print(f"\nwrote {len(outcomes)} scored outcomes to {out}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="coe444")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -133,7 +163,19 @@ def main() -> int:
     p_rep.add_argument("scored")
     p_rep.set_defaults(fn=cmd_report)
 
+    p_res = sub.add_parser("rescore")
+    p_res.add_argument("run_log")
+    p_res.add_argument("--threshold", type=float, default=None,
+                       help="detection threshold (default: conditions.DEFAULT_DETECTION_THRESHOLD)")
+    p_res.add_argument("--write", action="store_true", help="save the scored rows next to the log")
+    p_res.add_argument("--out", default=None, help="where --write saves them")
+    p_res.set_defaults(fn=cmd_rescore)
+
     args = parser.parse_args()
+    if getattr(args, "threshold", None) is None and args.cmd == "rescore":
+        from conditions import DEFAULT_DETECTION_THRESHOLD
+
+        args.threshold = DEFAULT_DETECTION_THRESHOLD
     return args.fn(args)
 
 

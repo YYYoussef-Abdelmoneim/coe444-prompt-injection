@@ -232,6 +232,22 @@ class RunRecord:
     # before the field existed, still describe themselves as unknown.
     policy_version: str = ""
 
+    # What scoring needs, so a log alone re-scores every condition with no
+    # corpus lookup and no API call (invariant 5). Defaulted so logs written
+    # before these fields existed still load; evaluation/runner.py falls back to
+    # the dev corpus for those.
+    split: str = ""
+    family: str = ""
+    attack_predicate: str | None = None
+    # The benign success spec, already resolved (carrier_success included).
+    success_spec: dict[str, Any] | None = None
+    canary: str = ""
+    # Every excerpt the agent read, in order, with its text, origin and poison
+    # flag. retrieved_chunk_ids alone cannot say which copy of a re-retrieved
+    # chunk carried the payload, and a detector can only be re-run offline on
+    # text that was logged.
+    chunks: list[TaggedChunk] = field(default_factory=list)
+
     @property
     def pairing_key(self) -> str:
         """Identifies the same trial across conditions, for the paired tests."""
