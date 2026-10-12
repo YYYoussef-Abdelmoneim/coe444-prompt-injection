@@ -17,3 +17,7 @@ results/*.json
 .DS_Store
 .hf-cache/
 scripts/activate.sh
+
+# LLMail-Inject raw downloads (MIT, ~1.7 GB upstream). Only the converted sample
+# attacks/external_llmail.json is tracked; regenerate it with attacks/convert_llmail.py.
+.data/llmail_inject/

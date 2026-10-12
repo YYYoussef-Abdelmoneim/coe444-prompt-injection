@@ -44,6 +44,11 @@ def test_every_external_payload_can_be_scored():
     assert is_attacker_address("CONTACT@contact.com")
 
 
+def test_every_external_payload_is_within_the_stated_length_cap():
+    doc = json.loads(EXTERNAL.read_text(encoding="utf-8"))
+    assert max(len(p["payload"]) for p in doc["payloads"]) <= doc["sampling"]["max_chars"]
+
+
 def test_every_address_in_the_external_corpus_is_under_a_reserved_name():
     for p in _external():
         for addr in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", p.payload):

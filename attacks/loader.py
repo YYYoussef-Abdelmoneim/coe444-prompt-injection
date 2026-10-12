@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from config import BENIGN_PATH, PAYLOADS_PATH
+from config import BENIGN_PATH, EXTERNAL_PAYLOADS_PATH, PAYLOADS_PATH
 
 
 @dataclass(frozen=True)
@@ -40,8 +40,20 @@ class BenignTask:
     notes: str = ""
 
 
+def _payload_file(split: str | None):
+    # "exploratory" is the converted LLMail-Inject set: its own file, never part of
+    # split=None, which stays our own corpus (dev + test).
+    return EXTERNAL_PAYLOADS_PATH if split == "exploratory" else PAYLOADS_PATH
+
+
+def corpus_version(split: str | None = None) -> str:
+    """Read from the corpus file itself, so a log can never claim a corpus it did
+    not run on (the version used to come from .env)."""
+    return json.loads(_payload_file(split).read_text(encoding="utf-8"))["corpus_version"]
+
+
 def load_payloads(split: str | None = None) -> list[Payload]:
-    raw = json.loads(PAYLOADS_PATH.read_text(encoding="utf-8"))
+    raw = json.loads(_payload_file(split).read_text(encoding="utf-8"))
     out = [
         Payload(
             id=p["id"], family=p["family"], evasion=p["evasion"], user_task=p["user_task"],

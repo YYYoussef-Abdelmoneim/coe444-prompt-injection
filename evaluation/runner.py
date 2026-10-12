@@ -24,13 +24,12 @@ from pathlib import Path
 from agent.agent import Agent
 from agent.llm import QuotaExhausted, get_provider
 from agent.prompts import SYSTEM_PROMPT_VERSION
-from attacks.loader import BenignTask, Payload, canary, contacts, load_benign, load_payloads
+from attacks.loader import BenignTask, Payload, canary, contacts, corpus_version, load_benign, load_payloads
 from conditions import ALL_CONDITIONS, DEFAULT_DETECTION_THRESHOLD, any_flagged, score
 from config import (
     AGENT_MODEL,
     AGENT_PROVIDER,
     SAMPLING,
-    CORPUS_VERSION,
     DETECTOR_CACHE_PATH,
     DETECTOR_MODEL,
     LOG_DIR,
@@ -78,6 +77,7 @@ class Runner:
         split: str = "dev",
         *,
         only: set[str] | None = None,
+        limit: int | None = None,
         resume: Path | str | None = None,
     ) -> tuple[list[RunRecord], list[ScoredOutcome]]:
         """Execute every task, then score. Writes incrementally.
@@ -97,6 +97,8 @@ class Runner:
         ] + [(t, False) for t in load_benign(split)]
         if only is not None:
             items = [(item, a) for item, a in items if item.id in only]
+        if limit is not None:
+            items = items[:limit]  # file order; the exploratory file round-robins its strata
         # Resolve every success spec before the first API call: a payload the
         # carrier rule cannot handle should fail here, not after the sweep.
         for item, is_attack in items:
@@ -188,7 +190,7 @@ class Runner:
             agent_model=AGENT_MODEL,
             detector_model=DETECTOR_MODEL,
             sampling=SAMPLING,
-            corpus_version=CORPUS_VERSION,
+            corpus_version=corpus_version(item.split),
             detector_prompt_version=f"{DETECTOR_PROMPT_VERSION}+{SYSTEM_PROMPT_VERSION}",
             git_commit=self.git,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -223,7 +225,7 @@ def _check_resumable(records: list[RunRecord], split: str, path: Path) -> None:
     """A resumed sweep must be one experiment: same corpus, prompts, gate,
     models and sampling as the runs already in the log, and the same split."""
     current = {
-        "corpus_version": CORPUS_VERSION,
+        "corpus_version": corpus_version(split),
         "detector_prompt_version": f"{DETECTOR_PROMPT_VERSION}+{SYSTEM_PROMPT_VERSION}",
         "policy_version": POLICY_VERSION,
         "agent_model": AGENT_MODEL,

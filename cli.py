@@ -111,7 +111,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
 
     runner = Runner(trials=args.trials)
     try:
-        records, outcomes = runner.run_all(split=args.split, only=only, resume=args.resume)
+        records, outcomes = runner.run_all(split=args.split, only=only, limit=args.limit, resume=args.resume)
     except QuotaExhausted:
         return 3  # run_all has said where the partial log is and how to resume
     print()
@@ -181,10 +181,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval = sub.add_parser("eval")
     # Defaults to dev. With no default the sweep ran both splits, which is how
     # the held-out test split gets opened by accident.
-    p_eval.add_argument("--split", default="dev", choices=["dev", "test"])
+    p_eval.add_argument("--split", default="dev", choices=["dev", "test", "exploratory"])
     p_eval.add_argument("--final", action="store_true",
                         help="required with --split test: this is the single final run")
     p_eval.add_argument("--only", default=None, help="comma-separated dev ids, for smoke runs")
+    p_eval.add_argument("--limit", type=int, default=None,
+                        help="run only the first N items, in file order")
     p_eval.add_argument("--resume", default=None, metavar="RUN_LOG",
                         help="continue a sweep that stopped on a free-tier limit, in the same log")
     p_eval.add_argument("--trials", type=int, default=3)
