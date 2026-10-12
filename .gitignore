@@ -10,6 +10,8 @@ logs/*.jsonl
 # because cli.py report reads scored logs and nothing can re-score a raw one yet.
 !logs/run-20260927T082229Z.jsonl
 !logs/scored-20260927T082229Z.jsonl
+# detector-v3a on the dev excerpt set: backs the threshold and the dev FNR/FPR.
+!logs/detector-20261012T203528Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store

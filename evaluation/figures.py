@@ -49,16 +49,21 @@ def roc_figure(curves: list[dict], chosen: dict, out: Path, *, title: str, subti
     if target is not None:
         max_fpr, min_tpr = target
         ax.fill_between([0, max_fpr], min_tpr, 1, color=INK, alpha=0.05, linewidth=0, zorder=0)
-        ax.text(max_fpr + 0.012, 1.0 - 0.012, f"proposal target\nFPR < {max_fpr:.0%}, FNR < {1 - min_tpr:.0%}",
-                color=MUTED, fontsize=7.6, va="top")
+        # Caption just outside the box's lower-right corner, clear of the curves
+        # and of the chosen-point label above it.
+        ax.text(max_fpr + 0.012, min_tpr, f"proposal target: FPR < {max_fpr:.0%}, FNR < {1 - min_tpr:.0%}",
+                color=MUTED, fontsize=7.6, va="bottom")
     for i, c in enumerate(curves):
-        xs, ys = zip(*sorted(c["points"]))
-        ax.step(xs, ys, where="post", color=SERIES[i], linewidth=2, solid_joinstyle="round",
-                solid_capstyle="round", label=f"{c['label']} (AUC {c['auc']:.2f})", zorder=3)
+        # Operating points joined by straight segments, the convention the
+        # trapezoid AUC assumes; a step would contradict the number in the legend.
+        xs, ys = zip(*sorted(set(c["points"])))
+        ax.plot(xs, ys, color=SERIES[i], linewidth=2, solid_joinstyle="round", solid_capstyle="round",
+                label=f"{c['label']}, AUC {c['auc']:.2f}", zorder=3)
     ax.scatter([chosen["fpr"]], [chosen["tpr"]], s=64, color=SERIES[0], edgecolors=SURFACE,
                linewidths=2, zorder=4)
-    ax.annotate(chosen["label"], (chosen["fpr"], chosen["tpr"]), xytext=(14, -22), textcoords="offset points",
-                fontsize=8.2, color=INK, arrowprops={"arrowstyle": "-", "color": MUTED, "linewidth": 0.8})
+    ax.annotate(chosen["label"], (chosen["fpr"], chosen["tpr"]), xytext=(0.22, 0.9), textcoords="data",
+                fontsize=8.2, color=INK, va="center",
+                arrowprops={"arrowstyle": "-", "color": MUTED, "linewidth": 0.8, "shrinkA": 2, "shrinkB": 5})
     ax.set_xlim(-0.01, 1.01)
     ax.set_ylim(-0.01, 1.04)
     ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
