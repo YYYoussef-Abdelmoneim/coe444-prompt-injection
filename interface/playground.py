@@ -31,11 +31,12 @@ from typing import Any
 
 from agent.agent import Agent, ExtraTool
 from conditions import DEFAULT_DETECTION_THRESHOLD, is_flagged
+from defense.detection import redact
 from config import DOCUMENTS_DIR
 from directory import Directory
 from mailsink import MailBackend, get_mail_backend
 from rag.chunker import canonical_document_id
-from schema import Origin, TaggedChunk, ToolCall
+from schema import DetectionResult, Origin, TaggedChunk, ToolCall
 
 _log = logging.getLogger(__name__)
 
@@ -232,8 +233,9 @@ class Playground:
         gate,
         detection_on: bool,
         prevention_on: bool,
+        detection_mode: str = "withhold",
     ) -> dict[str, Any]:
-        run = _LiveRun(self, detector, gate, detection_on, prevention_on, message)
+        run = _LiveRun(self, detector, gate, detection_on, prevention_on, message, detection_mode)
         agent = Agent(
             provider,
             _LiveRetriever(retriever, self.poisons, run),
@@ -282,9 +284,13 @@ def _implemented(component) -> bool:
 class _LiveRun:
     """Per-run state: what the agent read, what each defense decided, what went out."""
 
-    def __init__(self, box: Playground, detector, gate, detection_on: bool, prevention_on: bool, prompt: str) -> None:
+    def __init__(self, box: Playground, detector, gate, detection_on: bool, prevention_on: bool, prompt: str,
+                 detection_mode: str = "withhold") -> None:
         self.box = box
         self.detector = detector
+        # "withhold" replaces a flagged excerpt with a notice; "remove_span" cuts
+        # only the text the detector quoted, and withholds when it cannot.
+        self.detection_mode = detection_mode
         self.gate = gate
         self.detection_on = detection_on
         self.prevention_on = prevention_on
@@ -300,12 +306,13 @@ class _LiveRun:
     def _scan(self, chunk: TaggedChunk) -> dict[str, Any]:
         try:
             d = self.detector.scan(chunk)
-            flagged = is_flagged(d, DEFAULT_DETECTION_THRESHOLD)
-            return {"score": d.score, "label": d.label, "error": d.error, "flagged": flagged}
         except Exception as exc:  # noqa: BLE001
             # A detector that crashes is an outage; fail closed like the
             # research harness does.
-            return {"score": 1.0, "label": "injection", "error": f"{type(exc).__name__}: {exc}", "flagged": True}
+            d = DetectionResult(chunk.chunk_id, 1.0, "injection", 0, "unavailable",
+                                error=f"{type(exc).__name__}: {exc}")
+        return {"score": d.score, "label": d.label, "error": d.error,
+                "flagged": is_flagged(d, DEFAULT_DETECTION_THRESHOLD), "span": d.span, "result": d}
 
     def screen(self, chunks: list[TaggedChunk], source: str) -> list[TaggedChunk]:
         """Detection's live slot: every external excerpt passes here before the
@@ -329,11 +336,20 @@ class _LiveRun:
                 "detection": None,
             }
             shown = c
+            entry["redacted"] = False
             if verdict is not None:
+                result = verdict.pop("result")
                 entry["detection"] = verdict
                 if verdict["flagged"]:
-                    shown = replace(c, text="[Withheld by detection: this excerpt was flagged as a possible prompt injection.]")
-            entry["withheld"] = shown is not c
+                    cut = (redact(c, result, threshold=DEFAULT_DETECTION_THRESHOLD)
+                           if self.detection_mode == "remove_span" else None)
+                    if cut is not None:
+                        shown = cut
+                        entry["redacted"] = True
+                        entry["shown_text"] = cut.text
+                    else:
+                        shown = replace(c, text="[Withheld by detection: this excerpt was flagged as a possible prompt injection.]")
+            entry["withheld"] = shown is not c and not entry["redacted"]
             self.read.append(entry)
             out.append(shown)
         return out

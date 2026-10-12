@@ -40,7 +40,7 @@ def test_detection_blocking_a_run_that_also_kills_the_task_is_not_a_win():
 
 
 def test_model_simply_not_complying_is_not_credited_to_the_defense():
-    o = score(record(detections=[det(0.1)]), B_DETECTION, attack_succeeded=False)
+    o = score(record(detections=[det(0.0)]), B_DETECTION, attack_succeeded=False)
     assert o.outcome is Outcome.NOCOMPLY
     assert o.blocked_by is None
 

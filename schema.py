@@ -72,6 +72,12 @@ class DetectionResult:
     latency_ms: int
     model: str
     error: str | None = None
+    # The injected text, copied from the excerpt by the classifier (detector-v3).
+    # Lets the live Mailbox cut just that text; scoring never reads it.
+    span: str | None = None
+    # True when the verdict came from the cache rather than a model call, so
+    # latency figures can leave it out.
+    cached: bool = False
 
     @property
     def failed(self) -> bool:

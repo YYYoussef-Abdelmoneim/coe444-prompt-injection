@@ -234,3 +234,17 @@ def test_resume_refuses_a_log_written_by_different_versions(monkeypatch, tmp_pat
 
     with pytest.raises(ValueError, match="corpus_version"):
         _runner(monkeypatch, tmp_path).run_all("dev", resume=log)
+
+
+def test_a_rate_limited_detector_stops_the_sweep_with_no_row_written(monkeypatch, tmp_path):
+    runner = _runner(monkeypatch, tmp_path)
+
+    class _Limited:
+        def scan_all(self, chunks):
+            raise QuotaExhausted("Cerebras tokens per day")
+
+    runner.detector = _Limited()
+    with pytest.raises(QuotaExhausted):
+        runner.run_all("dev")
+    [log] = tmp_path.glob("run-*.jsonl")
+    assert log.read_text() == ""

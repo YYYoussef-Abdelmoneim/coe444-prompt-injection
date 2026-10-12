@@ -31,11 +31,13 @@ from config import (
     AGENT_PROVIDER,
     SAMPLING,
     CORPUS_VERSION,
+    DETECTOR_CACHE_PATH,
     DETECTOR_MODEL,
     LOG_DIR,
     TRIALS_PER_TASK,
 )
 from defense.detection import DETECTOR_PROMPT_VERSION, Detector
+from defense.verdict_cache import VerdictCache
 from defense.prevention import POLICY_VERSION, ProvenanceGate
 from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
@@ -64,7 +66,7 @@ class Runner:
         self.directory = Directory.load()
         self.agent = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), self.retriever, self.mail,
                            directory=self.directory)
-        self.detector = detector if detector is not None else Detector()
+        self.detector = detector if detector is not None else Detector(cache=VerdictCache(DETECTOR_CACHE_PATH))
         # Scoring ground truth for "to my manager"-style tasks; never shown to the gate.
         self.contacts = contacts()
         self.gate = ProvenanceGate(internal_domains=self.directory.internal_domains)

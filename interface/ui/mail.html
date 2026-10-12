@@ -193,6 +193,11 @@
             <button class="toggle-btn active" data-on="0">OFF</button><button class="toggle-btn" data-on="1">ON</button>
           </span>
         </span>
+        <span class="sw" title="With detection on: withhold a flagged excerpt whole, or cut only the text the detector quoted">Flagged text
+          <span class="toggle-group" id="tg-detmode">
+            <button class="toggle-btn active" data-on="0">WITHHOLD</button><button class="toggle-btn" data-on="1">CUT SPAN</button>
+          </span>
+        </span>
         <span class="sw">Prevention
           <span class="toggle-group" id="tg-prevention">
             <button class="toggle-btn active" data-on="0">OFF</button><button class="toggle-btn" data-on="1">ON</button>
@@ -215,6 +220,7 @@ let MAILBOX = null;
 let LAST_RUN = null;
 let LAST_TASK = '';
 let DETECTION_ON = false, PREVENTION_ON = false;
+let DETECTION_MODE = 'withhold';  // or 'remove_span' (detector-v3 quotes the span)
 
 function escHtml(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -298,6 +304,7 @@ async function init() {
   document.getElementById('run-btn').addEventListener('click', run);
   wireToggle('tg-detection', v => { DETECTION_ON = v; renderStubNote(); });
   wireToggle('tg-prevention', v => { PREVENTION_ON = v; renderStubNote(); });
+  wireToggle('tg-detmode', v => { DETECTION_MODE = v ? 'remove_span' : 'withhold'; });
   document.getElementById('result').addEventListener('click', ev => {
     if (ev.target.closest('[data-reset]')) resetAll();
   });
@@ -393,6 +400,7 @@ async function run() {
     const r = await fetch('/api/assistant', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: task, detection: DETECTION_ON, prevention: PREVENTION_ON,
+                            detection_mode: DETECTION_MODE,
                             payload_id: CURRENT.kind === 'attack' ? CURRENT.id : '' }),
     });
     const data = await r.json();

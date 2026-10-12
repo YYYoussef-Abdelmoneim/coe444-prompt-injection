@@ -48,7 +48,12 @@ ALL_CONDITIONS: tuple[Condition, ...] = (A_BASELINE, B_DETECTION, C_PREVENTION, 
 # The detector returns a calibrated score; the label is a threshold away. Kept
 # here rather than in detection.py so a threshold sweep re-scores from existing
 # logs without re-running a single API call.
-DEFAULT_DETECTION_THRESHOLD = 0.5
+#
+# 0.10 for detector-v3a: chosen on the dev excerpt set by the rule fixed before
+# any score was seen (maximise Youden's J, ties upward). See
+# results/threshold_dev.md and logs/detector-20261012T203528Z.jsonl. Re-choose,
+# on dev only, whenever DETECTOR_PROMPT_VERSION or the detector model changes.
+DEFAULT_DETECTION_THRESHOLD = 0.10
 
 
 def score(
