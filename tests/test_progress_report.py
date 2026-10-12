@@ -15,7 +15,7 @@ def _email(call_id, **args):
     return ToolCall(call_id, "send_email", {"subject": "s", "body": "b", **args})
 
 
-def _rec(task_id, *, attack, calls=(), decisions=(), detections=(), trial=1, turns=3, final="Done, here it is.",
+def _rec(task_id, *, attack, calls=(), decisions=(), detections=(), trial=1, turns=3, final="Done: here is the answer you asked for.",
          prompt="Email the rules to hr@northwind.example.", spec=None, predicate=None):
     return RunRecord(
         run_id=f"{task_id}-{trial}", task_id=task_id, trial=trial, is_attack=attack, user_prompt=prompt,
