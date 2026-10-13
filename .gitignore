@@ -15,6 +15,12 @@ logs/*.jsonl
 # LLMail-Inject exploratory baseline (Step D): backs results/llmail_baseline.md.
 !logs/run-20261012T202019Z.jsonl
 !logs/scored-20261012T202019Z.jsonl
+# Pre-registered detector checks (Step E): the variance check and the out-of-sample run.
+!logs/detector-variance-20261012T211059Z.jsonl
+!logs/detector-external-20261012T215514Z.jsonl
+# The dev evaluation (Step E): backs results/progress_summary.md and its figures.
+!logs/run-20261013T100754Z.jsonl
+!logs/scored-20261013T100754Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store

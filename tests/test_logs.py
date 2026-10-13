@@ -65,6 +65,19 @@ def test_a_record_survives_a_round_trip_through_jsonl(tmp_path):
     assert back.chunks[0].origin is Origin.EXTERNAL and back.chunks[0].is_poisoned
 
 
+def test_a_scored_log_loads_back_into_outcomes_row_for_row():
+    """A scored log omits executed_calls, so they load empty; everything else round-trips."""
+    from evaluation.logs import load_scored
+
+    rows = [json.loads(line) for line in BASELINE_SCORED.read_text(encoding="utf-8").splitlines() if line.strip()]
+    outcomes = load_scored(BASELINE_SCORED)
+    assert len(outcomes) == len(rows) > 0
+    for o, r in zip(outcomes, rows):
+        assert (o.run_id, o.task_id, o.trial, o.condition, o.blocked_by) == \
+            (r["run_id"], r["task_id"], r["trial"], r["condition"], r["blocked_by"])
+        assert o.outcome is Outcome(r["outcome"]) and o.executed_calls == []
+
+
 def test_a_log_written_before_the_scoring_fields_existed_still_loads():
     from evaluation.logs import load_records
 

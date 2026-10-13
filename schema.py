@@ -276,6 +276,9 @@ class RunRecord:
     # gate judges each call on that prefix only, so a lookup made after an
     # email cannot vouch for the email's recipients.
     context_at: dict[str, int] = field(default_factory=dict)
+    # Model turns the agent used (MAX_TURNS means it hit the limit). 0 in logs
+    # written before the field existed.
+    turns: int = 0
 
     @property
     def pairing_key(self) -> str:

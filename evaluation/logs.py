@@ -1,4 +1,4 @@
-"""Read run logs back into RunRecords.
+"""Read run logs back into RunRecords, and scored logs into ScoredOutcomes.
 
 Invariant 5 says every metric comes from logs/*.jsonl, and before this module
 nothing could read one back. RunRecord.to_json uses dataclasses.asdict, so nested
@@ -24,8 +24,10 @@ from schema import (
     FieldClass,
     FieldProvenance,
     Origin,
+    Outcome,
     PolicyDecision,
     RunRecord,
+    ScoredOutcome,
     TaggedChunk,
     ToolCall,
 )
@@ -42,6 +44,22 @@ def load_records(path: Path | str) -> list[RunRecord]:
             if line.strip():
                 records.append(record_from_dict(json.loads(line), where=f"{path.name}:{n}"))
     return records
+
+
+def load_scored(path: Path | str) -> list[ScoredOutcome]:
+    """Every ScoredOutcome in a scored log, in file order. write_scored does not
+    record executed calls, so they load empty."""
+    path = Path(path)
+    outcomes: list[ScoredOutcome] = []
+    with path.open(encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            if line.strip():
+                d = _known(ScoredOutcome, json.loads(line), f"{path.name}:{n}")
+                d["outcome"] = Outcome(d["outcome"])
+                d.setdefault("executed_calls", [])
+                d.setdefault("blocked_by", None)
+                outcomes.append(ScoredOutcome(**d))
+    return outcomes
 
 
 def record_from_dict(data: dict[str, Any], *, where: str = "record") -> RunRecord:
