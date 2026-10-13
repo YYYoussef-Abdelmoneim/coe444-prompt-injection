@@ -228,6 +228,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_prog.add_argument("--dev-log", default="logs/detector-20261012T203528Z.jsonl")
     p_prog.add_argument("--external-log", default=None, help="default: the newest logs/detector-external-*.jsonl")
     p_prog.add_argument("--llmail-log", default="logs/run-20261012T202019Z.jsonl")
+    p_prog.add_argument("--baseline-scored", default="logs/scored-20260927T082229Z.jsonl",
+                        help="the previous (superseded) baseline, to say how condition A moved")
     p_prog.add_argument("--out-dir", default="results")
     p_prog.set_defaults(fn=cmd_progress_report)
 
@@ -331,6 +333,7 @@ def cmd_progress_report(args: argparse.Namespace) -> int:
         iter(sorted(Path("logs").glob("detector-external-*.jsonl"), reverse=True)), None)
     out = write_progress_summary(Path(args.eval_log), dev_log=Path(args.dev_log), external_log=external,
                                  llmail_log=Path(args.llmail_log), out_dir=Path(args.out_dir),
+                                 baseline_scored=Path(args.baseline_scored),
                                  threshold=args.threshold if args.threshold is not None else DEFAULT_DETECTION_THRESHOLD)
     print("wrote " + ", ".join(str(p) for p in out))
     return 0
