@@ -84,3 +84,18 @@ The legacy ONBOARDING.md and TEAM-PLAN.md retain earlier project-stage instructi
 > Read TEAM_START_HERE.md, docs/TEAM_GUIDE.md, docs/PROGRESS_EVIDENCE.md and CLAUDE.md. I am presenting slide [number]. Explain that slide and its relevant code in simple English, then ask me likely professor questions. Separate implemented behavior from historical measurements and pending evaluation. Do not open or tune against the held-out attack texts, print .env or credentials, or call paid or external APIs without my authorization. Start with the relevant code and saved development evidence.
 
 Use your own model-service keys locally. Never put keys or private documents in commits. All email in this project remains simulated.
+
+## Where the test examples came from
+
+Yes, we found a public attack dataset: [Microsoft LLMail-Inject on Hugging Face](https://huggingface.co/datasets/microsoft/llmail-inject-challenge), under the MIT license. The source revision stored in our converted file is `1063bdf01ec8762b812d5e06ee768a06faa5a6f7`.
+
+- **200 external attacks** were selected and adapted from that dataset. Only 50 have saved agent runs; two runs had errors.
+- **203 clean emails** came from that dataset’s false-alarm test file and were used in the separate detector check.
+- **23 custom attacks** are project-specific examples: 10 development and 13 held out. The main progress table uses the 10 development attacks, repeated three times.
+- **14 normal tasks**, fictional company policies and staff contacts are local project test material.
+
+Our converter selects originally successful challenge attacks and places their email text in a retrieved policy excerpt. It rewrites ordinary addresses to reserved test addresses where its conversion rule applies. Our model, task and recipient-only attack scoring differ from the original challenge, so the results are exploratory and cannot be compared directly with the original benchmark. See `attacks/convert_llmail.py` and source metadata in `attacks/external_llmail.json`.
+
+The dataset provides examples. Our logs record what happened when our system tested them. The October 13 main log supports the custom development table; the October 12 external agent log supports the separate 50-run comparison; the external detector log supports the 50 attack excerpt and 203 clean email label check. They are evidence records, not downloaded result claims.
+
+We built the agent environment, defenses and evaluation using existing models and libraries. Everything was not created from scratch, and the attack examples are stored as files rather than queried from a live attack database.

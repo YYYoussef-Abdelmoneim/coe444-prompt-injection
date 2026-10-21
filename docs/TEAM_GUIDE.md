@@ -1,4 +1,5 @@
-# COE444 AI Agent Security Team Presentation Guide
+# COE444 AI Agent Security
+Team Presentation Guide
 
 Prompt Injection Detection and Prevention for AI Agents
 
@@ -200,6 +201,33 @@ The saved October 13 experiment log. Rescoring those records with the project’
 
 Handover: "We will now explain the external checks and compare our results with the original goals."
 
+## Where our attacks and test data came from
+
+### The direct answer to the professor
+
+"Yes, we found an existing public dataset: Microsoft’s LLMail-Inject on Hugging Face. We selected and adapted 200 attacks for our agent environment. We also have 23 custom attack examples. The main progress table uses ten custom development attacks. A separate saved experiment uses fifty external attacks. We keep these results separate because the tasks and scoring differ."
+
+### What came from outside and what we built
+
+| Part | Where it came from and how we use it |
+| --- | --- |
+| 200 external attacks | Selected and adapted from Microsoft’s LLMail-Inject challenge dataset. They are not attacks we invented. Fifty have saved agent runs. |
+| 203 clean emails | From the same dataset’s false-alarm test file. Used in the separate detector check, not as 203 complete agent tasks. |
+| 23 custom attacks | Project-specific examples stored in our own attack file: ten for development and thirteen kept aside for final testing. |
+| 14 normal tasks | Project-specific tasks: seven for development and seven held out. |
+| Company information | Made-up policies and staff contacts for the Northwind test company. These are local test files, not private company records. |
+| Agent and defenses | Our project implements the tool loop, attack insertion, detector instructions, recipient gate, logs and scoring using existing AI models and software libraries. |
+
+### How the external attacks were adapted
+
+The original attacks were malicious emails in an email-assistant challenge. Our converter places their subject and body inside a retrieved policy excerpt and changes ordinary email addresses to reserved test addresses where the conversion rule applies. Our agent, task and success rule differ from the original challenge. We selected attacks marked successful in that original challenge; this is a selected sample, not a random sample of all possible attacks. We cannot compare our success percentages directly with the original benchmark.
+
+### Dataset and result records are different things
+
+A dataset is a collection of examples used for testing. A log is a record made after our system runs those examples. The dataset supplies attack text; our own experiment logs supply the progress report results. We use downloaded files, not a live attack database connection.
+
+Original dataset: https://huggingface.co/datasets/microsoft/llmail-inject-challenge  |  MIT license. Our saved source revision begins 1063bdf. Conversion and source details are in attacks/convert_llmail.py and attacks/external_llmail.json.
+
 ## The test counts everyone must understand
 
 ### Software checks and attack experiments measure different things
@@ -210,7 +238,7 @@ A software check asks whether code follows a rule. For example, can a rejected d
 | --- | --- |
 | 256 software checks | All pass after the latest changes. This was 246 before ten new regression cases. |
 | 23 custom attacks | Ten development examples plus thirteen held-out examples. |
-| 200 external attacks | A separate stored collection from LLMail-Inject. |
+| 200 external attacks | Adapted from Microsoft’s public LLMail-Inject dataset; separate from our custom attacks. |
 | 223 stored attacks | The total available inventory  23 plus 200. |
 | 50 external agent runs | The saved external agent experiment evaluated fifty of the two hundred. |
 | 50 attacks and 203 clean emails | A separate check of the detector’s labels. These are text excerpts, not 253 complete agent tasks. |
@@ -227,9 +255,15 @@ Suppose one attack succeeds in two of its three repeats. We count that example a
 
 Development examples help us build the system and choose settings. Held-out examples stay aside until the final evaluation. Testing on them too early would let us adjust the system to the answers and make the final result less fair.
 
-### The exact sources if the professor asks
+## Where the reported results are recorded
 
-The main source is logs/run-20261013T100754Z.jsonl. The external agent source is logs/run-20261012T202019Z.jsonl. The external detector source is logs/detector-external-20261012T215514Z.jsonl. JSONL is just a text file with one saved record on each line. You do not need to memorize the full filenames; know what each file records.
+These are evidence files produced by our experiments, not the original attack dataset. A JSONL file is a text file with one saved record per line. Know which experiment each file records; you do not need to memorize the filenames.
+
+| Saved evidence | What it supports |
+| --- | --- |
+| Main development run | logs/run-20261013T100754Z.jsonl: ten custom attacks and seven normal tasks, three repeats each. Its 51 records support the main A to D table through offline scoring. |
+| External agent run | logs/run-20261012T202019Z.jsonl: fifty adapted LLMail attacks run once each. Two errors leave 48 valid runs for the reported no-defense and gate-only comparison. |
+| External detector check | logs/detector-external-20261012T215514Z.jsonl: labels for fifty attack excerpts and 203 clean dataset emails. Supports detector misses and false alarms, not complete agent performance. |
 
 ## Slide 4 Expected Outcomes
 
@@ -237,7 +271,7 @@ Speaker 4  |  Purpose: explain goals and what the extra checks show
 
 ### The external agent check
 
-We have fifty saved runs using external attacks. Two runs had agent errors, so the main calculation uses 48 valid runs. Without defenses, nine attacks succeeded. With the recipient gate, zero succeeded. This experiment used an unfinished detector that did not filter attacks, so it only supports the no-defense and gate-only comparison.
+The external source is Microsoft’s LLMail-Inject dataset. We adapted 200 attacks and have fifty saved runs using these external attacks. Two runs had agent errors, so the main calculation uses 48 valid runs. Without defenses, nine attacks succeeded. With the recipient gate, zero succeeded. This experiment used an unfinished detector that did not filter attacks, so it only supports the no-defense and gate-only comparison.
 
 Do not say all 200 external attacks were evaluated or that both defenses blocked all of them. The saved agent run covers fifty. Also, zero successful attacks in 48 valid runs does not guarantee zero risk on future examples.
 
@@ -253,7 +287,7 @@ The intended outcome is useful agent work with fewer attacker-directed actions. 
 
 ### A simple speaking script
 
-"We want the agent to resist attacker instructions and still finish the user’s task. We checked external examples as well as our own. In fifty external agent runs, two had errors. Of the 48 valid runs, nine attacks succeeded without defenses and none with the gate. A separate detector check missed three of fifty attacks and raised no false alarms on 203 clean emails. These results support further work, but do not prove general agent security. The combined below 5% target remains unmet in our development table. Live approval adds human supervision and still needs evaluation."
+"We want the agent to resist attacker instructions and still finish the user’s task. We found Microsoft’s public LLMail-Inject dataset and adapted 200 attacks. We checked fifty of them separately from our custom examples. In fifty external agent runs, two had errors. Of the 48 valid runs, nine attacks succeeded without defenses and none with the gate. A separate detector check missed three of fifty attacks and raised no false alarms on 203 clean emails. These results support further work, but do not prove general agent security. The combined below 5% target remains unmet in our development table. Live approval adds human supervision and still needs evaluation."
 
 ### Questions you should be ready for
 
