@@ -2,9 +2,15 @@
 
 COE444 Computer Security, Fall 2026 — American University of Sharjah.
 
-A sandboxed email agent that is deliberately vulnerable to indirect prompt
-injection, slots for two independent defense layers, and an evaluation harness
-that measures them as a 2×2 factorial with a utility axis.
+A bounded AI agent chooses tools to carry out a user goal. An attacker can try
+to redirect its decisions through retrieved text. We study that security problem
+in a sandboxed email environment, comparing a text detector and a recipient-source
+gate while measuring attack success and legitimate task completion.
+
+The model selects tool calls and arguments over up to six turns. The new protected
+live-send review is an additional supervised boundary, not evidence that every
+action can be authorized autonomously. See [the team guide](docs/TEAM_GUIDE.md)
+for the implemented agent loop, a recorded attack example and scope limits.
 
 Both defenses are implemented. `make spec-detection` and `make spec-prevention`
 check their requirements. With prevention enabled, the live Mailbox strips or

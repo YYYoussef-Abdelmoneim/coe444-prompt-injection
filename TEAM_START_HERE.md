@@ -1,6 +1,6 @@
 # COE444 team start here
 
-The main branch contains the reviewed project code, the progress presentation and a simple-English study guide for all five team members.
+The main branch contains the reviewed project code, the progress presentation and a simple-English study guide for all five team members. The project studies an AI agent choosing tools to carry out a user goal, and an attacker trying to redirect its decisions through outside text. Simulated email is the controlled test environment.
 
 ## Read these first
 
@@ -34,6 +34,10 @@ git pull --ff-only origin main
 ```
 
 The default main branch includes the reviewed progress code and team materials. The earlier progress branches remain available as historical checkpoints.
+
+## What the implementation demonstrates
+
+`Agent.run` lets the model choose tool calls and inputs, feeds tool results back to it, and repeats for up to six model turns. This is bounded autonomy, not an unrestricted background worker. The saved PI-101 run shows document search followed by a send proposal with an attacker CC. Our detector checks text and our gate checks email-recipient sources. The new live review makes the final protected send supervised; it does not establish fully autonomous action authorization. The guide maps these statements to code and explains the limits.
 
 ## Current status
 
