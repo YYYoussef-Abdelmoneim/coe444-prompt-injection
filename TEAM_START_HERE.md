@@ -1,6 +1,6 @@
 # COE444 team start here
 
-This branch contains the reviewed project code, the progress presentation and a simple-English study guide for all five team members.
+The main branch contains the reviewed project code, the progress presentation and a simple-English study guide for all five team members.
 
 ## Read these first
 
@@ -21,7 +21,7 @@ Choose one speaker for each of the five slides and update the presenter labels t
 ## Get this version
 
 ```sh
-git clone --branch progress/team-handoff https://github.com/YYYoussef-Abdelmoneim/coe444-prompt-injection.git
+git clone https://github.com/YYYoussef-Abdelmoneim/coe444-prompt-injection.git
 cd coe444-prompt-injection
 ```
 
@@ -29,10 +29,11 @@ If you already cloned it, commit or stash your own changes before switching:
 
 ```sh
 git fetch origin
-git switch progress/team-handoff
+git switch main
+git pull --ff-only origin main
 ```
 
-The default main branch is an older version. Use this branch for the reviewed progress materials. The existing results/progress branch and its draft PR remain separate.
+The default main branch includes the reviewed progress code and team materials. The earlier progress branches remain available as historical checkpoints.
 
 ## Current status
 
