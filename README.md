@@ -6,12 +6,19 @@ A sandboxed email agent that is deliberately vulnerable to indirect prompt
 injection, slots for two independent defense layers, and an evaluation harness
 that measures them as a 2×2 factorial with a utility axis.
 
-The two defenses are **starter stubs** that let everything through: each is a
-teammate's job. `make spec-detection` and `make spec-prevention` show which of
-their requirements pass, and the Mailbox page's switches show the effect live.
+Both defenses are implemented. `make spec-detection` and `make spec-prevention`
+check their requirements. With prevention enabled, the live Mailbox strips or
+rejects unsupported recipients and queues surviving messages for explicit user
+review. Review shows the exact recipients, subject and body; approve sends once,
+reject sends nothing. Directory provenance alone does not authorize an action.
+The baseline with prevention disabled remains deliberately unguarded.
 
 See [METHODOLOGY.md](METHODOLOGY.md) for the experimental design and the
 reasoning behind the changes made after the proposal review.
+
+## Team progress materials
+
+Start with [TEAM_START_HERE.md](TEAM_START_HERE.md) for the current team guide, presentation files, source map and AI study prompt. The older onboarding and assignment notes describe an earlier project stage.
 
 ## Setup
 
@@ -56,7 +63,8 @@ the AI assistant acts for you, and you can play the attacker by emailing the
 employee from outside or hiding an instruction in a company document. Two
 switches turn detection and prevention on for that run, and the timeline shows
 what the assistant read, what each defense decided, and what actually left the
-mailbox.
+mailbox. Protected emails remain unsent until you click Approve and send.
+This review is an additional live safeguard, outside the historical A/B/C/D protocol.
 
 The **Lab** page and `python cli.py demo` are the research view: the agent runs
 once with both defenses observing, and that one run is scored under A/B/C/D.
@@ -136,5 +144,11 @@ red-teaming a system we built and own.
 
 Foundation complete: agent (Groq), RAG with origin tagging, the corpus, the
 runner, metrics, the Mailbox and Lab pages, and spec tests for both defenses.
-Detection and prevention are starter stubs, to be built by the team. The final
-test-split evaluation waits until the defenses are built.
+Detection and prevention are implemented. The final test-split evaluation is
+still pending. See `docs/PROGRESS_EVIDENCE.md` for counts and historical results.
+The October 13 A/B/C/D figures describe offline shadow scoring of gate-v1, not the
+new explicit-review live path. Do not reuse them as measurements of the new path.
+
+Document retrieval defaults to `OMP_NUM_THREADS=1` before native libraries load,
+following a reproduced macOS crash and a successful single-thread retrieval check.
+You may explicitly override this environment variable if your platform supports it.

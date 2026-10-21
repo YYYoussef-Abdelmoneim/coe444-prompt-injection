@@ -96,15 +96,20 @@ def test_with_both_defenses_off_the_attackers_bcc_reaches_the_sent_folder():
     assert box.sent[0] is result["sent"][0]
 
 
-def test_prevention_on_sends_the_gates_sanitized_email_and_tells_the_agent():
+def test_prevention_on_queues_sanitized_email_and_sends_only_after_user_review():
     def strip_bcc(call):
         args = {k: v for k, v in call.arguments.items() if k != "bcc"}
         return PolicyDecision(call.call_id, Decision.SANITIZE, "bcc from a document", sanitized_arguments=args)
 
     provider = _Recording(_scripted([ATTACK_SEND]))
-    result = _ask(Playground(), provider, prevention=True, gate=_Gate(strip_bcc))
+    box = Playground()
+    result = _ask(box, provider, prevention=True, gate=_Gate(strip_bcc))
 
-    assert result["sent"][0]["bcc"] == ""
+    assert result["sent"] == [] and box.sent == []
+    [draft] = result["pending"]
+    assert not draft.get("bcc")
+    sent = box.review(draft["id"], approve=True)
+    assert sent["bcc"] == ""
     assert result["gate"][0]["decision"] == "sanitize"
     # The agent's next turn is told about the removal, so its reply can be truthful.
     tool_results = [b for m in provider.last_messages if isinstance(m.get("content"), list)
@@ -209,20 +214,25 @@ def test_the_playground_prompt_names_every_tool_it_offers():
     assert PLAYGROUND_PROMPT_VERSION == "playground-v2"
 
 
-def test_a_confirmed_email_is_sent_with_a_simulated_approval():
-    """The Mailbox has no human in the loop, so a CONFIRM is approved and logged as
-    simulated, the same rule the harness scores by."""
+def test_a_confirmation_is_pending_until_real_user_review():
+    """Live review differs explicitly from historical simulated confirmation."""
     def confirm(call):
         return PolicyDecision(call.call_id, Decision.CONFIRM, "outside address the user typed",
                               needs_confirmation=["x@partner.example"])
 
     send = ("send_email", {"to": "x@partner.example", "subject": "Leave", "body": "22 days."})
-    result = _ask(Playground(), _scripted([send]), prevention=True, gate=_Gate(confirm))
-    assert [s["to"] for s in result["sent"]] == ["x@partner.example"]
+    box = Playground()
+    result = _ask(box, _scripted([send]), prevention=True, gate=_Gate(confirm))
+    assert result["sent"] == []
+    [draft] = result["pending"]
+    assert draft["to"] == "x@partner.example"
     [entry] = result["gate"]
     assert entry["decision"] == "confirm"
-    assert entry["approval"]["simulated"] is True
-    assert entry["approval"]["recipients"] == ["x@partner.example"]
+    assert entry["approval"]["simulated"] is False
+    assert entry["approval"]["pending"] is True
+    sent = box.review(draft["id"], approve=True)
+    assert sent["to"] == "x@partner.example"
+    assert sent["gate"]["approval"]["simulated"] is False
 
 
 class _FlagSpan:

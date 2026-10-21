@@ -7,20 +7,23 @@ numbers.
 
 This module is the opposite: one live run under whatever the user switched on.
 Detection ON really withholds a flagged excerpt before the agent reads it;
-prevention ON really rewrites or refuses an email before it reaches the Sent
-folder. So the agent's own reply describes what actually happened, which a
+prevention ON rewrites or refuses an email, then queues surviving mail for
+explicit user review before it reaches the Sent folder. So the agent's own reply describes what actually happened, which a
 shadow run cannot do.
 
-Nothing here makes a security decision. It only wires the team's
-Detector.scan and ProvenanceGate.evaluate into the live path, so their work
-shows up in the interface the moment it exists. While they are still stubs,
-every attack goes through - which is the point of the starting line.
+Detector.scan and ProvenanceGate.evaluate remain independent. The additional
+live review boundary requires explicit approval of the exact recipients and
+content; directory provenance alone cannot establish user authorization.
+This review step is not part of the historical shadow-scored experiments.
 
 Containment is unchanged: sending lands in a MailSink, never on a network.
 """
 
 from __future__ import annotations
 
+import copy
+import secrets
+import threading
 import itertools
 import logging
 import time
@@ -143,6 +146,8 @@ class Playground:
 
     def __init__(self, directory: Directory | None = None) -> None:
         self._ids = itertools.count(1)
+        self._review_lock = threading.Lock()
+        self._pending_mail: dict[str, tuple[dict, Any, dict]] = {}
         # What lookup_contact reads, and where the gate learns the company's own
         # domains. A file, never the inbox: an outsider who fakes a company
         # From: line must not be able to add themselves.
@@ -152,6 +157,8 @@ class Playground:
     # ── Mailbox ──────────────────────────────────────────────────────────────
 
     def reset(self) -> None:
+        with self._review_lock:
+            self._pending_mail.clear()
         self.inbox: list[dict[str, Any]] = []
         self.sent: list[dict[str, Any]] = []
         self.poisons: dict[str, str] = {}
@@ -201,6 +208,32 @@ class Playground:
             "gate": gate,
             "left_company": [r.strip() for r in recipients if _outside_company(r)],
         }
+
+    def queue_review(self, args: dict, sink, gate: dict) -> dict:
+        """Freeze the exact proposed email outside the model's tool surface."""
+        token = secrets.token_urlsafe(24)
+        saved = copy.deepcopy(args)
+        with self._review_lock:
+            if len(self._pending_mail) >= 50:
+                raise PermissionError("Review or reject existing drafts before creating more.")
+            self._pending_mail[token] = (saved, sink, copy.deepcopy(gate))
+        return {"id": token, **copy.deepcopy(saved)}
+
+    def review(self, token: str, *, approve: bool) -> dict | None:
+        """One user decision consumes one draft; the request cannot replace its bytes."""
+        if type(approve) is not bool:
+            raise ValueError("approve must be a boolean")
+        with self._review_lock:
+            args, sink, gate = self._pending_mail.pop(token)
+        if not approve:
+            return None
+        sink.send(to=args["to"], subject=args.get("subject", ""), body=args.get("body", ""),
+                  cc=args.get("cc"), bcc=args.get("bcc"))
+        gate["approval"] = {"simulated": False, "approved": True, "by": EMPLOYEE["address"],
+                            "at": _now()}
+        entry = self._sent_entry(args, via="assistant", gate=gate)
+        self.sent.insert(0, entry)
+        return entry
 
     # ── Documents ────────────────────────────────────────────────────────────
 
@@ -254,6 +287,8 @@ class Playground:
             "read": run.read,
             "gate": run.gate_log,
             "sent": new_sent,
+            "pending": run.pending_reviews,
+            "approval_mode": "explicit-review-v1" if prevention_on else "off",
             "defenses": {
                 "detection": {"on": detection_on, "implemented": _implemented(detector)},
                 "prevention": {"on": prevention_on, "implemented": _implemented(gate)},
@@ -297,6 +332,7 @@ class _LiveRun:
         self.prompt = prompt
         self.read: list[dict[str, Any]] = []
         self.gate_log: list[dict[str, Any]] = []
+        self.pending_reviews: list[dict[str, Any]] = []
         self.seen: list[TaggedChunk] = []
         self.planted: dict[str, str] = {}
         self.sink = get_mail_backend()
@@ -442,13 +478,24 @@ class _LiveMail(MailBackend):
                 raise PermissionError(f"The security gate blocked this email: {d.reason}")
             if d.sanitized:
                 final = {k: v for k, v in (d.sanitized_arguments or {}).items() if v}
-            approve = list(getattr(d, "needs_confirmation", None) or [])
-            if approve:
-                # No human in the loop here, so the employee is taken to approve:
-                # the same simulated approval the research harness scores by.
-                entry["approval"] = {"simulated": True, "approved": True, "by": EMPLOYEE["address"],
-                                     "at": _now(), "recipients": approve}
-            entry["sent"] = dict(final)
+            # A trusted address is not permission to send. All protected sends
+            # require a real decision outside the agent's tool surface.
+            draft = next((x for x in run.pending_reviews
+                          if {k: v for k, v in x.items() if k != "id"} == final), None)
+            if draft is None:
+                draft = run.box.queue_review(final, run.sink,
+                                            {"decision": entry["decision"], "reason": entry["reason"]})
+                run.pending_reviews.append(draft)
+            entry["sent"] = None
+            entry["pending_id"] = draft["id"]
+            entry["approval"] = {"simulated": False, "approved": False, "pending": True}
+            run.gate_log.append(entry)
+            removed = [a for f in ("to", "cc", "bcc") for a in str(args.get(f) or "").split(",")
+                       if a.strip() and a.strip().lower() not in str(final.get(f) or "").lower()]
+            note = ("; removed " + ", ".join(removed)) if removed else ""
+            # Raising produces a tool error, rather than agent.py's canned
+            # 'Sent' receipt. The model cannot truthfully claim a send occurred.
+            raise PermissionError("Email not sent: draft awaits explicit user review" + note)
         run.gate_log.append(entry)
 
         run.sink.send(

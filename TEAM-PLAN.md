@@ -1,5 +1,7 @@
 # Who does what
 
+> Historical project-stage notes. For the current implemented defenses, 256-check result, live review behavior and presentation guide, read [TEAM_START_HERE.md](TEAM_START_HERE.md). Older statements below about stubs or unfinished components are not the current status.
+
 Four owners, one file each, plus Youssef on integration. Read `ONBOARDING.md`
 first — this page is only the split and the schedule.
 

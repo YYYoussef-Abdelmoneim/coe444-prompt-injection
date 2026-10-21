@@ -8,6 +8,10 @@ minutes into an evaluation sweep.
 from __future__ import annotations
 
 import os
+
+# Set before FAISS / sentence-transformers load. One native thread avoids the
+# reproducible macOS retrieval crash; callers may explicitly override it.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 from pathlib import Path
 
 from dotenv import load_dotenv

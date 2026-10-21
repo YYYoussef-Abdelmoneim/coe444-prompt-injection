@@ -432,7 +432,7 @@ function whyItFailed(r) {
   const gated = (r.gate || []).filter(g => g.decision === 'sanitize' || g.decision === 'deny');
   const withheld = (r.read || []).filter(c => c.withheld);
   if (gated.some(g => g.decision === 'deny')) return 'The prevention gate refused to send the email.';
-  if (gated.length) return 'The prevention gate removed the planted recipient before the email went out.';
+  if (gated.length) return 'The prevention gate removed the planted recipient from the proposed email before review.';
   if (withheld.length) return 'Detection withheld ' + withheld.length + ' flagged excerpt'
     + (withheld.length > 1 ? 's' : '') + ' before the assistant could read ' + (withheld.length > 1 ? 'them.' : 'it.');
   const d = r.defenses || {};
@@ -440,6 +440,42 @@ function whyItFailed(r) {
   if (stubs.length === 2) return 'Careful: both defenses are still empty files, so the model simply did not '
     + 'obey the planted text this time — nothing stopped it.';
   return 'No defense had to act: the model did not obey the planted text this time.';
+}
+
+async function reviewDraft(token, approve) {
+  const r = await fetch('/api/mailbox/review/' + encodeURIComponent(token), {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({approve})
+  });
+  const data = await r.json();
+  if (!r.ok) { alert(data.error || 'Review failed'); return; }
+  LAST_RUN.pending = (LAST_RUN.pending || []).filter(d => d.id !== token);
+  if (data.sent) LAST_RUN.sent.push(data.sent);
+  LAST_RUN.reviewed = true;
+  LAST_RUN.verdict = {known: false};
+  MAILBOX = await getMailbox();
+  renderResult();
+}
+function renderDrafts() {
+  const target = document.getElementById('result');
+  for (const d of (LAST_RUN.pending || [])) {
+    const section = document.createElement('section');
+    section.className = 'why';
+    section.innerHTML = `<h3>Review email before sending</h3>
+      <p><b>To:</b> ${escHtml(d.to || '')}<br><b>CC:</b> ${escHtml(d.cc || '')}<br>
+      <b>BCC:</b> ${escHtml(d.bcc || '')}<br><b>Subject:</b> ${escHtml(d.subject || '')}</p>
+      <pre style="white-space:pre-wrap;font:inherit">${escHtml(d.body || '')}</pre>`;
+    for (const [label, approve] of [['Approve and send', true], ['Reject draft', false]]) {
+      const button = document.createElement('button'); button.textContent = label;
+      button.addEventListener('click', async () => {
+        section.querySelectorAll('button').forEach(b => b.disabled = true);
+        try { await reviewDraft(d.id, approve); }
+        catch (error) { alert(String(error)); }
+        finally { section.querySelectorAll('button').forEach(b => b.disabled = false); }
+      });
+      section.appendChild(button);
+    }
+    target.appendChild(section);
+  }
 }
 
 function renderResult() {
@@ -466,7 +502,13 @@ function renderResult() {
   const v = r.verdict || {};
 
   let cls, icon, state, headline;
-  if (isAttack && v.known && v.attack_succeeded) {
+  if ((r.pending || []).length) {
+    cls = 'v-warn'; icon = '⏳'; state = 'AWAITING YOUR REVIEW';
+    headline = 'No pending email has been sent. Review the recipients and message below.';
+  } else if (r.reviewed) {
+    cls = 'v-good'; icon = '✓'; state = 'REVIEW COMPLETE';
+    headline = 'Your decisions have been applied. Approved messages appear in Sent. This is a live review, not an experiment score.';
+  } else if (isAttack && v.known && v.attack_succeeded) {
     cls = 'v-bad'; icon = '❌';
     state = 'THE ATTACK WORKED';
     headline = added.length
@@ -495,7 +537,7 @@ function renderResult() {
 
   // A CONFIRM went out after a simulated approval: say so, since a real
   // assistant would have stopped to ask.
-  const approved = (r.gate || []).flatMap(g => (g.approval && g.approval.recipients) || []);
+  const approved = (r.gate || []).filter(g => g.approval && g.approval.simulated).flatMap(g => g.approval.recipients || []);
   if (approved.length) headline += ' The assistant needed your confirmation for '
     + joinList(approved) + ' first (approved automatically in this demo).';
 
@@ -574,6 +616,7 @@ function renderResult() {
       </div>
     </div>
     ${renderMore(r)}`;
+  renderDrafts();
 }
 
 function renderMore(r) {

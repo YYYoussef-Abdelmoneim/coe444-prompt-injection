@@ -22,6 +22,7 @@ scoreable rather than inventing a verdict. See CLAUDE.md invariants 2 and 5.
 
 import logging
 import os
+
 import sys
 import time
 import traceback
@@ -643,6 +644,18 @@ def api_mailbox_compose():
     return jsonify(entry)
 
 
+@app.route("/api/mailbox/review/<token>", methods=["POST"])
+def api_mailbox_review(token):
+    data = request.json or {}
+    if type(data.get("approve")) is not bool:
+        return jsonify({"error": "approve must be a boolean"}), 400
+    try:
+        entry = get_playground().review(token, approve=data["approve"])
+    except KeyError:
+        return jsonify({"error": "Draft no longer exists or was already reviewed."}), 404
+    return jsonify({"sent": entry, "approved": data["approve"]})
+
+
 @app.route("/api/mailbox/reset", methods=["POST"])
 def api_mailbox_reset():
     get_playground().reset()
@@ -753,7 +766,9 @@ def api_assistant():
     # applied to what was actually sent after the gate.
     payload_id = str(data.get("payload_id") or "").strip()
     if payload_id:
-        result["verdict"] = _judge(payload_id, result)
+        result["verdict"] = ({"known": False, "pending": True,
+                              "reason": "Awaiting explicit user review; no final outcome yet."}
+                             if result.get("pending") else _judge(payload_id, result))
     return jsonify(_with_usage(result))
 
 

@@ -1,5 +1,7 @@
 # COE444 — start here
 
+> Historical project-stage notes. For the current implemented defenses, 256-check result, live review behavior and presentation guide, read [TEAM_START_HERE.md](TEAM_START_HERE.md). Older statements below about stubs or unfinished components are not the current status.
+
 You're joining a working prototype. Everything runs; two pieces are deliberately
 left empty for you to fill. This page gets you from clone to a running demo in
 about ten minutes, then shows you which file is yours.
