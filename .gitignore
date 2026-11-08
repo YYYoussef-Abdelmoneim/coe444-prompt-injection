@@ -31,6 +31,9 @@ logs/*.jsonl
 # composition-v2 live logs (evaluation/live.py).
 !logs/live-20261108T181653Z.jsonl
 !logs/scored-live-20261108T181653Z.jsonl
+# 8 Nov: the full dev live sweep (results/live_dev_summary.md).
+!logs/live-20261108T183213Z.jsonl
+!logs/scored-live-20261108T183213Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store
