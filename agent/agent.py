@@ -100,6 +100,7 @@ class Agent:
         *,
         inject: str | None = None,
         inject_into: str | None = None,
+        inject_meta: dict[str, Any] | None = None,
     ) -> AgentRun:
         started = time.monotonic()
         out = AgentRun(user_prompt=user_prompt)
@@ -109,9 +110,14 @@ class Agent:
         # the run starts - the attacker sent it; it is waiting to be read. The
         # run only counts as having delivered it once read_inbox returns it,
         # the same way a document payload counts only when retrieved.
+        # inject_meta may name the sender and subject, and add further messages
+        # (a multi-stage attack is several emails).
         planted_mail: str | None = None
         if inject is not None and inject_into == "inbox" and self.inbox is not None:
-            planted_mail = self.inbox.plant(inject)
+            meta = inject_meta or {}
+            for extra in meta.get("extra_messages", []):
+                self.inbox.plant(extra["body"], sender=extra.get("sender"), subject=extra.get("subject"))
+            planted_mail = self.inbox.plant(inject, sender=meta.get("sender"), subject=meta.get("subject"))
             inject = None
 
         try:

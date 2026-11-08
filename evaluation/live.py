@@ -309,7 +309,8 @@ class LiveRunner:
         )
         run = agent.run(item.user_task,
                         inject=item.payload if is_attack else None,
-                        inject_into=item.inject_into if is_attack else None)
+                        inject_into=item.inject_into if is_attack else None,
+                        inject_meta=getattr(item, "inject_meta", None) if is_attack else None)
 
         # proposed_calls carry what the model asked for; a call the gate let run
         # (as proposed or sanitized) is recorded in state.executed. The model's

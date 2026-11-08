@@ -168,7 +168,9 @@ class Runner:
         # the next trial.
         inbox = Inbox()
         self.agent.inbox = inbox
-        run = self.agent.run(item.user_task, inject=inject, inject_into=inject_into)
+        meta = getattr(item, "inject_meta", None) if is_attack else None
+        run = (self.agent.run(item.user_task, inject=inject, inject_into=inject_into, inject_meta=meta)
+               if meta else self.agent.run(item.user_task, inject=inject, inject_into=inject_into))
 
         # Both defenses observe. Neither alters what already happened. The
         # detector reads only untrusted text: directory entries are company

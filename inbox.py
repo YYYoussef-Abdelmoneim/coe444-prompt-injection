@@ -69,7 +69,8 @@ class Inbox:
     planted_id: str | None = None
 
     def plant(self, body: str, *, sender: str | None = None, subject: str | None = None) -> str:
-        """Add the attacker's email. Returns its chunk id."""
+        """Add an attacker email. Returns its chunk id. The last planted message
+        is the one the run tracks as the payload carrier."""
         msg = {
             "id": f"m{len(self.messages) + 1}",
             "sender": sender or DEFAULT_ATTACK_SENDER,

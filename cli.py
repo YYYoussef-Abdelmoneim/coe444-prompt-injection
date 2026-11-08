@@ -133,10 +133,12 @@ def cmd_eval_live(args: argparse.Namespace) -> int:
         from attacks.loader import load_benign, load_payloads
 
         only = {i.strip() for i in args.only.split(",") if i.strip()}
-        dev_ids = {p.id for p in load_payloads("dev")} | {t.id for t in load_benign("dev")}
-        unknown = sorted(only - dev_ids)
+        # Never the test split: --only on test would open held-out payloads one by one.
+        pick = args.split if args.split != "test" else "dev"
+        ids = {p.id for p in load_payloads(pick)} | {t.id for t in load_benign(pick)}
+        unknown = sorted(only - ids)
         if unknown:
-            print(f"--only takes dev ids; not in the dev split: {', '.join(unknown)}")
+            print(f"--only takes ids from the {pick} split; unknown: {', '.join(unknown)}")
             return 2
 
     from agent.llm import QuotaExhausted
@@ -228,7 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval = sub.add_parser("eval")
     # Defaults to dev. With no default the sweep ran both splits, which is how
     # the held-out test split gets opened by accident.
-    p_eval.add_argument("--split", default="dev", choices=["dev", "test", "exploratory"])
+    p_eval.add_argument("--split", default="dev", choices=["dev", "test", "exploratory", "advanced"])
     p_eval.add_argument("--final", action="store_true",
                         help="required with --split test: this is the single final run")
     p_eval.add_argument("--only", default=None, help="comma-separated dev ids, for smoke runs")
@@ -240,7 +242,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval.set_defaults(fn=cmd_eval)
 
     p_live = sub.add_parser("eval-live", help="composition-v2: shadow run (A, C) plus live B and D")
-    p_live.add_argument("--split", default="dev", choices=["dev", "test", "exploratory"])
+    p_live.add_argument("--split", default="dev", choices=["dev", "test", "exploratory", "advanced"])
     p_live.add_argument("--final", action="store_true", help="required with --split test")
     p_live.add_argument("--only", default=None, help="comma-separated dev ids")
     p_live.add_argument("--limit", type=int, default=None)
