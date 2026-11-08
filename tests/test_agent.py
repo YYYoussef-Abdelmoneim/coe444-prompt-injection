@@ -144,16 +144,16 @@ def test_each_call_records_how_much_had_been_read_before_it_ran():
     assert len(run.chunks) == 2
 
 
-def test_the_measured_agent_is_agent_v2_with_three_tools_and_six_turns():
+def test_the_measured_agent_is_agent_v3_with_four_tools_and_six_turns():
     from agent.agent import MAX_TURNS
     from agent.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION
     from agent.tools import FIELD_CLASSES, TOOL_SCHEMAS
     from schema import FieldClass
 
-    assert {t["name"] for t in TOOL_SCHEMAS} == {"search_documents", "lookup_contact", "send_email"}
+    assert {t["name"] for t in TOOL_SCHEMAS} == {"search_documents", "lookup_contact", "read_inbox", "send_email"}
     assert FIELD_CLASSES["lookup_contact"] == {"query": FieldClass.CONTENT}
     assert MAX_TURNS == 6
-    assert SYSTEM_PROMPT_VERSION == "agent-v2" and "lookup_contact" in SYSTEM_PROMPT
+    assert SYSTEM_PROMPT_VERSION == "agent-v3" and "read_inbox" in SYSTEM_PROMPT
 
 
 def test_the_system_prompt_stays_unhardened():

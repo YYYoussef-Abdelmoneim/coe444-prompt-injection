@@ -301,6 +301,13 @@ class RunRecord:
     # The record this live run pairs with (the shadow run of the same task and
     # trial, scored as A/C), so the paired tests can be rebuilt from logs.
     paired_run_id: str | None = None
+    # sanitize-v1 (layer 0): per excerpt that was changed before detection read
+    # it, {"chunk_id", "actions": [...]}. Empty when nothing was hidden.
+    sanitize_actions: list[dict[str, Any]] = field(default_factory=list)
+    sanitize_version: str = ""
+    # agent-v3: the inbox the agent could read in this run, as the attacker
+    # channel. Each item is {"id","sender","subject","body","planted": bool}.
+    inbox: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def pairing_key(self) -> str:

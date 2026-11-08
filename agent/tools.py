@@ -37,6 +37,9 @@ FIELD_CLASSES: dict[str, dict[str, FieldClass]] = {
     "lookup_contact": {
         "query": FieldClass.CONTENT,
     },
+    # Reading the inbox has no arguments and no side effect. What it returns is
+    # stamped EXTERNAL (inbox.py): an email is attacker-reachable text.
+    "read_inbox": {},
 }
 
 TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -70,6 +73,17 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "required": ["query"],
             "additionalProperties": False,
         },
+    },
+    # agent-v3. The inbox is the realistic attacker channel: anyone can email
+    # the employee, and the agent reads it because the user asked.
+    {
+        "name": "read_inbox",
+        "description": (
+            "Read the emails in the user's inbox: sender, subject and full body of each "
+            "message. Use this when the user asks about their email or asks you to act on "
+            "a message they received."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "send_email",

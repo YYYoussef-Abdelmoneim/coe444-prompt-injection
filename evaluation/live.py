@@ -61,9 +61,11 @@ from conditions import (
 from config import AGENT_MODEL, AGENT_PROVIDER, DETECTOR_MODEL, LOG_DIR, SAMPLING, TRIALS_PER_TASK
 from defense.detection import DETECTOR_PROMPT_VERSION, redact
 from defense.prevention import POLICY_VERSION
+from defense.sanitize import SANITIZE_VERSION, sanitize_chunk
 from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded
 from evaluation.runner import Runner, _check_resumable, score_records, write_scored
+from inbox import Inbox
 from mailsink import MailBackend, MailSink
 from schema import DetectionResult, Origin, Outcome, PolicyDecision, RunRecord, ScoredOutcome, TaggedChunk, ToolCall
 
@@ -87,6 +89,7 @@ class _LiveState:
         self.seen: list[TaggedChunk] = []          # what the agent actually read, in order
         self.detections: list[DetectionResult] = []
         self.actions: list[dict[str, Any]] = []
+        self.sanitize_actions: list[dict[str, Any]] = []
         self.shown_text: dict[str, str] = {}
         self.decisions: list[PolicyDecision] = []
         self.executed: dict[str, dict[str, Any]] = {}  # call_id -> arguments that really ran
@@ -100,13 +103,20 @@ class _LiveState:
     # ── Detection in the loop ────────────────────────────────────────────────
 
     def screen(self, chunks: list[TaggedChunk]) -> list[TaggedChunk]:
-        """Scan every external excerpt; return what the agent may read."""
+        """Every external excerpt passes here before the agent reads it. Under
+        a detection condition, sanitize-v1 runs first (hidden text made visible
+        or removed) and then the detector; both are the input-side defense.
+        Without detection the agent reads the raw text, so C stays gate-only."""
         out: list[TaggedChunk] = []
         for c in chunks:
             if c.origin is not Origin.EXTERNAL or not self.condition.detection:
                 self.seen.append(c)
                 out.append(c)
                 continue
+            c, acts = sanitize_chunk(c)
+            if acts:
+                self.sanitize_actions.append({"chunk_id": c.chunk_id, "actions": list(acts)})
+                self.shown_text[c.chunk_id] = c.text
             verdict = self.detector.scan(c)   # QuotaExhausted propagates: a limit is not a verdict
             self.detections.append(verdict)
             shown = c
@@ -150,6 +160,24 @@ class _SeenDirectory:
         chunks = self.base.search(query)
         self.state.seen.extend(chunks)
         return chunks
+
+
+class _ScreenedInbox:
+    """The inbox with sanitize and detection applied to each email before the
+    agent reads it. Planting is untouched: the attacker's mail is in the box."""
+
+    def __init__(self, base: Inbox, state: _LiveState) -> None:
+        self.base = base
+        self.state = state
+
+    def plant(self, body: str, **kw) -> str:
+        return self.base.plant(body, **kw)
+
+    def chunks(self) -> list[TaggedChunk]:
+        return self.state.screen(self.base.chunks())
+
+    def as_log(self):
+        return self.base.as_log()
 
 
 class _GatedMail(MailBackend):
@@ -271,11 +299,13 @@ class LiveRunner:
                   *, paired: str | None) -> RunRecord:
         spec = self.shadow._success_spec(item, is_attack)
         state = _LiveState(self.shadow.detector, self.shadow.gate, cond, item.user_task, self.mode)
+        inbox = _ScreenedInbox(Inbox(), state)
         agent = Agent(
             self.provider,
             _FilteringRetriever(self.shadow.retriever, state),
             _GatedMail(state),
             directory=_SeenDirectory(self.shadow.directory, state),
+            inbox=inbox,
         )
         run = agent.run(item.user_task,
                         inject=item.payload if is_attack else None,
@@ -328,6 +358,9 @@ class LiveRunner:
             detection_actions=list(state.actions),
             shown_text=dict(state.shown_text),
             paired_run_id=paired,
+            sanitize_actions=list(state.sanitize_actions),
+            sanitize_version=SANITIZE_VERSION,
+            inbox=inbox.as_log(),
         )
 
 
@@ -368,8 +401,8 @@ def score_live(rec: RunRecord, *, canary: str, contacts: dict[str, str]) -> Scor
         return _mk(rec, cond, Outcome.RETRIEVAL_MISS, [], None)
 
     blocked_by: str | None = None
-    if rec.detection_actions:
-        blocked_by = "detection"
+    if rec.detection_actions or rec.sanitize_actions:
+        blocked_by = "detection"   # the input-side layer: sanitize + detector
     elif any(d.denied or d.sanitized for d in rec.policy_decisions):
         blocked_by = "prevention"
 

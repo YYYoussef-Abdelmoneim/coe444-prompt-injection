@@ -74,6 +74,7 @@ class Agent:
         mail: MailBackend,
         *,
         directory=None,
+        inbox=None,
         extra_tools: list[ExtraTool] | None = None,
         system_prompt: str = SYSTEM_PROMPT,
     ) -> None:
@@ -84,8 +85,13 @@ class Agent:
         # Loaded on first use, so an agent that never looks anyone up never
         # reads the file.
         self.directory = directory
+        # agent-v3: anything with chunks() -> list[TaggedChunk] stamped EXTERNAL
+        # and plant(text) -> chunk_id. None means read_inbox finds no mail.
+        self.inbox = inbox
         self.extra_tools = {t.schema["name"]: t for t in extra_tools or []}
-        self.tool_schemas = TOOL_SCHEMAS + [t.schema for t in self.extra_tools.values()]
+        # An extra tool with a built-in's name replaces that built-in's schema.
+        self.tool_schemas = [s for s in TOOL_SCHEMAS if s["name"] not in self.extra_tools] + [
+            t.schema for t in self.extra_tools.values()]
         self.system_prompt = system_prompt
 
     def run(
@@ -98,6 +104,15 @@ class Agent:
         started = time.monotonic()
         out = AgentRun(user_prompt=user_prompt)
         messages: list[dict[str, Any]] = [{"role": "user", "content": user_prompt}]
+
+        # agent-v3: an attack aimed at the inbox is planted as one email before
+        # the run starts - the attacker sent it; it is waiting to be read. The
+        # run only counts as having delivered it once read_inbox returns it,
+        # the same way a document payload counts only when retrieved.
+        planted_mail: str | None = None
+        if inject is not None and inject_into == "inbox" and self.inbox is not None:
+            planted_mail = self.inbox.plant(inject)
+            inject = None
 
         try:
             for _ in range(MAX_TURNS):
@@ -121,7 +136,7 @@ class Agent:
                     # again. Decided here, where it persists across calls.
                     pending = inject if out.poisoned_chunk_id is None else None
                     out.context_at[call.id] = len(out.chunks)
-                    results.append(self._execute(call, out, pending, inject_into))
+                    results.append(self._execute(call, out, pending, inject_into, planted_mail))
                 messages.append({"role": "user", "content": results})
             else:
                 out.final_text = "(turn limit reached)"
@@ -142,6 +157,7 @@ class Agent:
         out: AgentRun,
         inject: str | None,
         inject_into: str | None,
+        planted_mail: str | None = None,
     ) -> dict[str, Any]:
         """Execute a proposed call and build the tool_result block.
 
@@ -151,7 +167,19 @@ class Agent:
         observing what an undefended agent actually did.
         """
         try:
-            if call.name == "search_documents":
+            # A caller-supplied tool wins over a built-in of the same name: the
+            # live Mailbox plugs in its own inbox this way.
+            if call.name in self.extra_tools:
+                chunks = self.extra_tools[call.name].run(dict(call.input))
+                # A plug-in tool may not hand the model text that claims to be
+                # anything but external - the tag is where it came from.
+                if any(c.origin is not Origin.EXTERNAL for c in chunks):
+                    raise ValueError(f"{call.name} returned a chunk not tagged EXTERNAL")
+                out.chunks.extend(chunks)
+                content = "\n\n---\n\n".join(
+                    f"[{c.chunk_id}] {c.text}" for c in chunks
+                ) or "Nothing found."
+            elif call.name == "search_documents":
                 chunks, poisoned = self.retriever.search(
                     str(call.input.get("query", "")), inject=inject, inject_into=inject_into
                 )
@@ -173,6 +201,16 @@ class Agent:
                 # A miss is plain text that never repeats the query: echoed
                 # back, an injected address would return stamped DIRECTORY.
                 content = "\n".join(c.text for c in chunks) or "No directory entry matches that name or role."
+            elif call.name == "read_inbox":
+                chunks = list(self.inbox.chunks()) if self.inbox is not None else []
+                if planted_mail is not None and out.poisoned_chunk_id is None and any(
+                    c.chunk_id == planted_mail for c in chunks
+                ):
+                    out.poisoned_chunk_id = planted_mail
+                out.chunks.extend(chunks)
+                content = "\n\n---\n\n".join(
+                    f"[{c.chunk_id}] {c.text}" for c in chunks
+                ) or "The inbox is empty."
             elif call.name == "send_email":
                 msg = self.mail.send(
                     to=str(call.input.get("to", "")),
@@ -182,16 +220,6 @@ class Agent:
                     bcc=call.input.get("bcc"),
                 )
                 content = f"Email sent to {msg.to}."
-            elif call.name in self.extra_tools:
-                chunks = self.extra_tools[call.name].run(dict(call.input))
-                # A plug-in tool may not hand the model text that claims to be
-                # anything but external - the tag is where it came from.
-                if any(c.origin is not Origin.EXTERNAL for c in chunks):
-                    raise ValueError(f"{call.name} returned a chunk not tagged EXTERNAL")
-                out.chunks.extend(chunks)
-                content = "\n\n---\n\n".join(
-                    f"[{c.chunk_id}] {c.text}" for c in chunks
-                ) or "Nothing found."
             else:
                 content = f"Unknown tool: {call.name}"
             return {"type": "tool_result", "tool_use_id": call.id, "content": content}

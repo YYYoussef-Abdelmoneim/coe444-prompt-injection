@@ -83,6 +83,22 @@ since 21 Oct.
   0.95 on Cerebras — variance at the boundary, amplified by the per-text verdict cache. Under D
   gate-v2 stripped the attacker and restored `finance@northwind.example`. Threshold **not**
   changed. Reported as the defense-in-depth case.
-- Second-detector probe: Meta Prompt Guard 2 (86M, Groq) scores PI-101's ride-along sentence
-  0.06 and a naive "ignore previous instructions" 0.999 — misses the family that lands. To be
-  measured on the full excerpt sets (item A6).
+### 7. Direction set after the professor's progress feedback — *decision*
+- **Trigger.** Instructor comments at the progress presentation: (a) "how does the attacker get
+  in to change the documents or the recipients? think like the attacker"; (b) "the attacker might
+  also chat with the agent directly."
+- **Decision (user-confirmed 8 Nov).**
+  - Scope stays **indirect** prompt injection; direct injection added only if time remains. A
+    direct-chat attacker already holds the user's session, so the agent obeying them is an
+    authentication failure (CLO2), not an injection one; the gate still prevents laundering an
+    address through planted text, and we say so in the report.
+  - The realistic entry channel is the **inbox** (anyone can email anyone; EchoLeak-style). The
+    research agent gets `read_inbox` (**agent-v3**, condition A re-measured) and a new attack
+    family `inbound_email`.
+  - **Corpus v0.3** (separate split, never pooled with frozen v0.2.1): hidden text (zero-width /
+    Unicode-tag "ASCII smuggling", HTML comments), multi-stage, sender impersonation, lookalike
+    domains, URL-based exfiltration, detector-targeted text, conditional triggers.
+  - **Defense upgrades:** deterministic hidden-text pre-filter before detection; lookalike-domain
+    warning in the review step; max-of-N detector scoring to damp boundary variance (PI-120 case).
+  - The frozen v0.2.1 held-out run remains the pre-registered confirmatory experiment; v0.3 is
+    reported as a second table.

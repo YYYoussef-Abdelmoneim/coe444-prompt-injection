@@ -36,10 +36,12 @@ from config import (
     TRIALS_PER_TASK,
 )
 from defense.detection import DETECTOR_PROMPT_VERSION, Detector
+from defense.sanitize import SANITIZE_VERSION, sanitize_chunk
 from defense.verdict_cache import VerdictCache
 from defense.prevention import POLICY_VERSION, ProvenanceGate
 from evaluation.logs import load_records
 from evaluation.predicates import attack_succeeded, benign_succeeded, carrier_success
+from inbox import Inbox
 from mailsink import get_mail_backend
 from rag.retriever import Retriever
 from directory import Directory
@@ -162,13 +164,26 @@ class Runner:
         inject = item.payload if is_attack else None
         inject_into = item.inject_into if is_attack else None
 
+        # agent-v3: a fresh inbox per run, so a planted email never leaks into
+        # the next trial.
+        inbox = Inbox()
+        self.agent.inbox = inbox
         run = self.agent.run(item.user_task, inject=inject, inject_into=inject_into)
 
         # Both defenses observe. Neither alters what already happened. The
         # detector reads only untrusted text: directory entries are company
-        # data. The gate judges each call on what had been read before it ran,
-        # so a lookup made after an email cannot vouch for its recipients.
-        detections = self.detector.scan_all([c for c in run.chunks if c.origin is Origin.EXTERNAL])
+        # data. sanitize-v1 runs first on that text, so hidden characters are
+        # visible to the detector; what it changed is logged. The gate judges
+        # each call on what had been read before it ran, so a lookup made after
+        # an email cannot vouch for its recipients.
+        external = [c for c in run.chunks if c.origin is Origin.EXTERNAL]
+        sanitized, sanitize_actions = [], []
+        for c in external:
+            s, acts = sanitize_chunk(c)
+            sanitized.append(s)
+            if acts:
+                sanitize_actions.append({"chunk_id": c.chunk_id, "actions": list(acts)})
+        detections = self.detector.scan_all(sanitized)
         decisions = [
             self.gate.evaluate(c, item.user_task, run.chunks[: run.context_at.get(c.call_id, len(run.chunks))])
             for c in run.proposed_calls
@@ -207,6 +222,9 @@ class Runner:
             chunks=list(run.chunks),
             context_at=dict(run.context_at),
             turns=run.turns,
+            sanitize_actions=sanitize_actions,
+            sanitize_version=SANITIZE_VERSION,
+            inbox=inbox.as_log(),
         )
         record._item = item  # type: ignore[attr-defined]
         return record
