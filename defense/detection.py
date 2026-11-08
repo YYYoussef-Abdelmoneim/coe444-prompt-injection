@@ -140,7 +140,10 @@ class Detector:
 
     def scan(self, chunk: TaggedChunk) -> DetectionResult:
         started = time.monotonic()
-        key = self.cache.key(chunk.text, DETECTOR_PROMPT_VERSION, self.model) if self.cache else None
+        # Keyed by host as well as model: the same open-weight model string is
+        # served by several hosts (Cerebras, Groq, Nous) and their scores differ
+        # (METHODOLOGY 5A), so a verdict from one must never stand in for another.
+        key = self.cache.key(chunk.text, DETECTOR_PROMPT_VERSION, f"{DETECTOR_PROVIDER}:{self.model}") if self.cache else None
         if key is not None:
             hit = self.cache.get(key)
             if hit is not None:

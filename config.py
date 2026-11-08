@@ -29,6 +29,15 @@ CEREBRAS_BASE_URL: str = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai
 CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")
 GROQ_BASE_URL: str = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+# Nous Research inference API (OpenAI-compatible). Serves the same open-weight
+# gpt-oss-20b / gpt-oss-120b without the free-tier daily caps that stopped the
+# Groq sweeps; the model strings are identical, so a run is the same experiment
+# on a different host (METHODOLOGY 5A applies: say which host in the report).
+NOUS_BASE_URL: str = os.getenv("NOUS_BASE_URL", "https://inference-api.nousresearch.com/v1")
+NOUS_API_KEY: str = os.getenv("NOUS_API_KEY", "")
+# Paced like a paid endpoint: generous, so the pacer never dominates a sweep.
+NOUS_MIN_INTERVAL_S: float = float(os.getenv("NOUS_MIN_INTERVAL_S", "0.5"))
+NOUS_TOKENS_PER_MINUTE: int = int(os.getenv("NOUS_TOKENS_PER_MINUTE", "400000"))
 
 AGENT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "cerebras")
 DETECTOR_PROVIDER: str = os.getenv("DETECTOR_PROVIDER", "cerebras")

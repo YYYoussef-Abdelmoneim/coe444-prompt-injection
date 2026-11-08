@@ -26,6 +26,11 @@ logs/*.jsonl
 !logs/detector-20261108T175204Z.jsonl
 !logs/run-20261108T175401Z.jsonl
 !logs/scored-20261108T175401Z.jsonl
+# 8 Nov: detector-v3a re-checked uncached on the Nous host before the live dev sweep.
+!logs/detector-20261108T183052Z.jsonl
+# composition-v2 live logs (evaluation/live.py).
+!logs/live-20261108T181653Z.jsonl
+!logs/scored-live-20261108T181653Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store

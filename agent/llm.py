@@ -40,6 +40,10 @@ from config import (
     GROQ_BASE_URL,
     GROQ_MIN_INTERVAL_S,
     GROQ_TOKENS_PER_MINUTE,
+    NOUS_API_KEY,
+    NOUS_BASE_URL,
+    NOUS_MIN_INTERVAL_S,
+    NOUS_TOKENS_PER_MINUTE,
     RATE_LIMIT_ATTEMPTS,
     RATE_LIMIT_MAX_WAIT_S,
 )
@@ -490,9 +494,12 @@ def get_provider(provider: str = "cerebras", model: str = AGENT_MODEL) -> LLMPro
     if provider == "groq":
         return OpenAICompatProvider(model=model, base_url=GROQ_BASE_URL, api_key=GROQ_API_KEY, pacer=_Pacer(
             min_interval_s=GROQ_MIN_INTERVAL_S, tokens_per_minute=GROQ_TOKENS_PER_MINUTE))
+    if provider == "nous":
+        return OpenAICompatProvider(model=model, base_url=NOUS_BASE_URL, api_key=NOUS_API_KEY, pacer=_Pacer(
+            min_interval_s=NOUS_MIN_INTERVAL_S, tokens_per_minute=NOUS_TOKENS_PER_MINUTE))
     raise RuntimeError(
         f"Unknown provider {provider!r}. Add a subclass in agent/llm.py and a branch here. "
-        "Known providers: 'cerebras' (any OpenAI-compatible endpoint), 'groq', 'anthropic'."
+        "Known providers: 'cerebras' (any OpenAI-compatible endpoint), 'groq', 'nous', 'anthropic'."
     )
 
 
