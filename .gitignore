@@ -43,6 +43,9 @@ logs/*.jsonl
 # 8 Nov: full v0.3 advanced sweep, single-draw detector (results/live_advanced_single_draw.md).
 !logs/live-20261108T201927Z.jsonl
 !logs/scored-live-20261108T201927Z.jsonl
+# 8 Nov: v0.3 advanced sweep, detector max-of-3, gate-v2 (results/live_advanced_max3.md).
+!logs/live-20261108T204601Z.jsonl
+!logs/scored-live-20261108T204601Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store
