@@ -278,6 +278,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_det.add_argument("--fp-emails", default=".data/llmail_inject/1063bdf/emails_for_fp_tests.json")
     p_det.add_argument("--dev-log", default="logs/detector-20261012T203528Z.jsonl")
     p_det.add_argument("--out-dir", default="results")
+    p_det.add_argument("--promptguard", action="store_true",
+                       help="also score the cross-vendor Prompt Guard 2 arm (Groq)")
     p_det.set_defaults(fn=cmd_detector_eval)
 
     p_var = sub.add_parser("detector-variance", help="repeat uncached calls near the threshold (Cerebras)")
@@ -309,7 +311,8 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_detector_eval(args: argparse.Namespace) -> int:
     """Score the fixed dev excerpt set with the LLM detector and the keyword
     baseline, and log every verdict. Cached verdicts cost no call, so a run that
-    stopped on a free-tier limit is simply run again."""
+    stopped on a free-tier limit is simply run again. --promptguard adds the
+    cross-vendor Prompt Guard 2 arm on the same excerpts."""
     from datetime import datetime, timezone
 
     from agent.llm import QuotaExhausted
@@ -339,6 +342,15 @@ def cmd_detector_eval(args: argparse.Namespace) -> int:
         print(f"\nSTOPPED, free-tier limit: {exc}\nVerdicts so far are cached; run this again later.")
         return 3
     rows += score_excerpts(excerpts, KeywordDetector(), name="keyword", version=BASELINE_VERSION)
+    if args.promptguard:
+        from defense.detection_promptguard import PROMPTGUARD_VERSION, PromptGuardDetector
+
+        print("\nPrompt Guard 2 (Meta, via Groq):")
+        try:
+            rows += score_excerpts(excerpts, PromptGuardDetector(), name="promptguard", version=PROMPTGUARD_VERSION)
+        except QuotaExhausted as exc:
+            print(f"\nSTOPPED (Prompt Guard), free-tier limit: {exc}")
+            return 3
     path = LOG_DIR / f"{prefix}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     write_log(rows, path)
     print(f"\nwrote {len(rows)} verdicts to {path}\n")
