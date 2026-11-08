@@ -46,6 +46,12 @@ logs/*.jsonl
 # 8 Nov: v0.3 advanced sweep, detector max-of-3, gate-v2 (results/live_advanced_max3.md).
 !logs/live-20261108T204601Z.jsonl
 !logs/scored-live-20261108T204601Z.jsonl
+# 8 Nov: frozen stack (gate-v3, max-of-3): advanced, dev, external OOS (results/frozen_stack_summary.md).
+!logs/live-20261108T211359Z.jsonl
+!logs/scored-live-20261108T211359Z.jsonl
+!logs/live-20261108T213725Z.jsonl
+!logs/scored-live-20261108T213725Z.jsonl
+!logs/detector-external-20261108T221027Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store
