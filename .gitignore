@@ -40,6 +40,9 @@ logs/*.jsonl
 # 8 Nov: advanced v0.3 corpus smoke (PI-201, PI-212, PI-271, BN-202).
 !logs/live-20261108T201636Z.jsonl
 !logs/scored-live-20261108T201636Z.jsonl
+# 8 Nov: full v0.3 advanced sweep, single-draw detector (results/live_advanced_single_draw.md).
+!logs/live-20261108T201927Z.jsonl
+!logs/scored-live-20261108T201927Z.jsonl
 results/*.csv
 results/*.json
 .DS_Store
