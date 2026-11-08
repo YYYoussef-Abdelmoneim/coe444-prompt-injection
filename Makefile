@@ -42,3 +42,13 @@ eval:
 	@echo "Use 'make eval-dev' while building. Tuning against test invalidates the result."
 	@read -p "Type 'final' to continue: " ans; [ "$$ans" = final ] || { echo "aborted"; exit 1; }
 	caffeinate -i python cli.py eval --split test --final
+
+# composition-v2 (evaluation/live.py): the shadow run scored as A and C, plus
+# live B and D with detection filtering input and the gate in front of sends.
+eval-live-dev:
+	caffeinate -i python cli.py eval-live --split dev
+
+eval-live-final:
+	@echo "This runs the HELD-OUT test split under composition-v2 — once, at the end."
+	@read -p "Type 'final' to continue: " ans; [ "$$ans" = final ] || { echo "aborted"; exit 1; }
+	caffeinate -i python cli.py eval-live --split test --final

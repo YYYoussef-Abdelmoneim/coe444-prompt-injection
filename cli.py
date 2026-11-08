@@ -119,6 +119,53 @@ def cmd_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval_live(args: argparse.Namespace) -> int:
+    """composition-v2: the shadow execution (A, C) plus one live execution per
+    live condition, defenses in the loop. See evaluation/live.py."""
+    from evaluation.metrics import summary_table
+
+    if args.split == "test" and not args.final:
+        print("The test split is held out until the final evaluation run (CLAUDE.md).\n"
+              "Use `make eval-live-final`, which asks first. Develop on --split dev.")
+        return 2
+    only = None
+    if args.only:
+        from attacks.loader import load_benign, load_payloads
+
+        only = {i.strip() for i in args.only.split(",") if i.strip()}
+        dev_ids = {p.id for p in load_payloads("dev")} | {t.id for t in load_benign("dev")}
+        unknown = sorted(only - dev_ids)
+        if unknown:
+            print(f"--only takes dev ids; not in the dev split: {', '.join(unknown)}")
+            return 2
+
+    from agent.llm import QuotaExhausted
+    from evaluation.live import LiveRunner
+
+    runner = LiveRunner(trials=args.trials, live=tuple(args.live.split(",")), mode=args.mode)
+    try:
+        records, outcomes = runner.run_all(split=args.split, only=only, limit=args.limit, resume=args.resume)
+    except QuotaExhausted:
+        return 3
+    print()
+    print(summary_table(outcomes, records=records))
+    return 0
+
+
+def cmd_rescore_live(args: argparse.Namespace) -> int:
+    """Re-score a live log (shadow records as A/C, live records as themselves)."""
+    from attacks.loader import canary, contacts
+    from evaluation.live import score_live_log
+    from evaluation.logs import load_records
+    from evaluation.metrics import summary_table
+
+    records = load_records(Path(args.run_log))
+    outcomes = score_live_log(records, canary=canary(), contacts=contacts())
+    print(f"{len(records)} records from {args.run_log}\n")
+    print(summary_table(outcomes, records=records))
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     from evaluation.metrics import summary_table
     from schema import Outcome, ScoredOutcome
@@ -191,6 +238,22 @@ def build_parser() -> argparse.ArgumentParser:
                         help="continue a sweep that stopped on a free-tier limit, in the same log")
     p_eval.add_argument("--trials", type=int, default=3)
     p_eval.set_defaults(fn=cmd_eval)
+
+    p_live = sub.add_parser("eval-live", help="composition-v2: shadow run (A, C) plus live B and D")
+    p_live.add_argument("--split", default="dev", choices=["dev", "test", "exploratory"])
+    p_live.add_argument("--final", action="store_true", help="required with --split test")
+    p_live.add_argument("--only", default=None, help="comma-separated dev ids")
+    p_live.add_argument("--limit", type=int, default=None)
+    p_live.add_argument("--resume", default=None, metavar="LIVE_LOG")
+    p_live.add_argument("--trials", type=int, default=3)
+    p_live.add_argument("--live", default="B,D", help="conditions to run live, among B,C,D (default B,D)")
+    p_live.add_argument("--mode", default="remove_span", choices=["remove_span", "withhold"],
+                        help="how live detection acts on a flagged excerpt")
+    p_live.set_defaults(fn=cmd_eval_live)
+
+    p_rl = sub.add_parser("rescore-live", help="re-score a live log, no API call")
+    p_rl.add_argument("run_log")
+    p_rl.set_defaults(fn=cmd_rescore_live)
 
     p_rep = sub.add_parser("report")
     p_rep.add_argument("scored")

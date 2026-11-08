@@ -30,10 +30,16 @@ strictly as ONE address, 'a@b.c' or 'Name <a@b.c>'. Then, per token:
                       appears only in retrieved content (excerpts, emails);
   stripped            everything else: an outside address from content, any
                       address found nowhere, a token that does not parse.
-DENY if a required field (to) is left empty - an email whose recipient was
-injected is not the user's email. Otherwise SANITIZE if anything was stripped
-(subject and body untouched). Otherwise CONFIRM if anything needs confirming:
-a simulated approval, so the email goes out as proposed. Otherwise ALLOW.
+If stripping leaves the required field (to) empty, gate-v2 REPAIRS it when the
+user's own prompt names exactly one address: that address becomes `to`, and the
+email goes out to the person the user actually named. The repair uses USER
+bytes only - never a directory entry, never document text - so a swapped
+recipient is undone without any judgement about content (invariant 4). With no
+typed address, or more than one, there is nothing unambiguous to restore and
+the call is DENIED: an email whose only recipient was injected is not the
+user's email. Otherwise SANITIZE if anything was stripped or restored (subject
+and body untouched). Otherwise CONFIRM if anything needs confirming: a
+simulated approval, so the email goes out as proposed. Otherwise ALLOW.
 
 The company's domains come from data/directory.json. They only decide whether
 an address the gate already attributed is the company's own; they never make an
@@ -72,8 +78,9 @@ from schema import Decision, FieldClass, FieldProvenance, Origin, PolicyDecision
 _log = logging.getLogger(__name__)
 
 # Recorded in every RunRecord. gate-stub-v0 allowed everything; provenance-v1
-# and -v2 (unmerged) trusted a static contact list.
-POLICY_VERSION = "gate-v1"
+# and -v2 (unmerged) trusted a static contact list; gate-v1 stripped and denied.
+# gate-v2 (8 Nov 2026) adds the user-typed repair of an emptied `to`.
+POLICY_VERSION = "gate-v2"
 
 # A dot-atom local part and a dotted domain: deliberately narrower than RFC 5322.
 # A quoted local part ('"audit"@x.invalid') or a source route ('@a.invalid:b@c')
@@ -112,6 +119,7 @@ class ProvenanceGate:
         provenance: list[FieldProvenance] = []
         stripped: list[str] = []
         confirm: list[str] = []
+        restored: list[str] = []
         sanitized = dict(call.arguments)
         unrepairable = False
 
@@ -132,18 +140,29 @@ class ProvenanceGate:
             if len(kept) == len(tokens):
                 continue
             # Strip, don't deny: the rest of the call is what the user asked for,
-            # so dropping it would turn a blocked attack into a broken task. A
-            # required field left empty cannot be repaired.
+            # so dropping it would turn a blocked attack into a broken task.
             if kept:
                 sanitized[name] = ", ".join(kept)
             elif is_required(call.tool_name, name):
-                unrepairable = True
+                # gate-v2: a required field emptied by stripping is repaired from
+                # the user's own bytes when they name exactly one address. The
+                # user asked for an email to that address; the injection swapped
+                # it. Two or more typed addresses, or none, is ambiguous: deny.
+                if len(typed) == 1:
+                    (address,) = typed
+                    sanitized[name] = address
+                    restored.append(address)
+                    provenance.append(FieldProvenance(name, FieldClass.CONTROL, Origin.USER, None, address))
+                    if address.rsplit("@", 1)[1] not in self.internal_domains and address not in confirm:
+                        confirm.append(address)
+                else:
+                    unrepairable = True
             else:
                 del sanitized[name]
 
-        decision, reason, repaired = self._decide(unrepairable, stripped, confirm, sanitized)
-        _log.info("gate %s %s %s stripped=%s confirm=%s",
-                  POLICY_VERSION, call.call_id, decision.value, stripped, confirm)
+        decision, reason, repaired = self._decide(unrepairable, stripped, confirm, sanitized, restored)
+        _log.info("gate %s %s %s stripped=%s restored=%s confirm=%s",
+                  POLICY_VERSION, call.call_id, decision.value, stripped, restored, confirm)
         return PolicyDecision(
             call_id=call.call_id,
             decision=decision,
@@ -185,17 +204,21 @@ class ProvenanceGate:
 
     @staticmethod
     def _decide(
-        unrepairable: bool, stripped: list[str], confirm: list[str], sanitized: dict[str, Any]
+        unrepairable: bool, stripped: list[str], confirm: list[str], sanitized: dict[str, Any],
+        restored: list[str] | None = None,
     ) -> tuple[Decision, str, dict[str, Any] | None]:
+        restored = restored or []
         to_confirm = (f"; confirm {', '.join(confirm)} (simulated approval)" if confirm else "")
         if unrepairable:
             return (Decision.DENY,
                     f"no recipient left after stripping {', '.join(stripped)}: not typed by the user "
-                    "and not returned by a directory lookup in this run", None)
+                    "and not returned by a directory lookup in this run, and the user's request names "
+                    "no single address to restore", None)
         if stripped:
+            fixed = f"; restored the user's own recipient {', '.join(restored)}" if restored else ""
             return (Decision.SANITIZE,
                     f"stripped {', '.join(stripped)}: not typed by the user and not returned by a "
-                    f"directory lookup in this run{to_confirm}", sanitized)
+                    f"directory lookup in this run{fixed}{to_confirm}", sanitized)
         if confirm:
             return (Decision.CONFIRM,
                     f"needs the user's confirmation: {', '.join(confirm)}; simulated approval, "

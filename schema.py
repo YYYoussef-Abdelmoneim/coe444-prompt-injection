@@ -280,6 +280,28 @@ class RunRecord:
     # written before the field existed.
     turns: int = 0
 
+    # ── Live-composition fields (composition-v2, 8 Nov 2026) ─────────────────
+    # "" / "shadow": the classic record above - defenses observed, nothing
+    # altered, scored four ways offline. "B" or "D": the defenses were IN THE
+    # LOOP for this execution (evaluation/live.py). Detection cut the flagged
+    # span (or withheld the excerpt) before the agent read it; under "D" the
+    # gate also rewrote or refused each send before it executed. Such a record
+    # is scored under its own condition only; it is not re-scorable as A.
+    live_condition: str = ""
+    # How detection acted on flagged excerpts in a live run: "remove_span" cuts
+    # the quoted span and falls back to "withhold" (the whole excerpt replaced
+    # by a notice) when the span cannot be cut verbatim.
+    detection_mode: str = ""
+    # What detection actually did, per flagged excerpt: {"chunk_id", "action"}
+    # where action is "removed_span" or "withheld". Empty for shadow records.
+    detection_actions: list[dict[str, Any]] = field(default_factory=list)
+    # What the agent read after detection acted (live only): chunk_id -> text
+    # shown, for the excerpts that were altered. Diagnostics, never scored.
+    shown_text: dict[str, str] = field(default_factory=dict)
+    # The record this live run pairs with (the shadow run of the same task and
+    # trial, scored as A/C), so the paired tests can be rebuilt from logs.
+    paired_run_id: str | None = None
+
     @property
     def pairing_key(self) -> str:
         """Identifies the same trial across conditions, for the paired tests."""
