@@ -463,6 +463,8 @@ function renderDrafts() {
     section.innerHTML = `<h3>Review email before sending</h3>
       <p><b>To:</b> ${escHtml(d.to || '')}<br><b>CC:</b> ${escHtml(d.cc || '')}<br>
       <b>BCC:</b> ${escHtml(d.bcc || '')}<br><b>Subject:</b> ${escHtml(d.subject || '')}</p>
+      ${(d.warnings || []).map(w => `<p class="warn" style="color:#b45309;border-left:3px solid #b45309;padding-left:8px">
+        <b>Look-alike domain:</b> ${escHtml(w.address)} — ${escHtml(w.reason)}. Check this is really who you mean.</p>`).join('')}
       <pre style="white-space:pre-wrap;font:inherit">${escHtml(d.body || '')}</pre>`;
     for (const [label, approve] of [['Approve and send', true], ['Reject draft', false]]) {
       const button = document.createElement('button'); button.textContent = label;

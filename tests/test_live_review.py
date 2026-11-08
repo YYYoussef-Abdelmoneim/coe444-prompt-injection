@@ -93,3 +93,19 @@ def test_review_endpoint_cannot_replace_the_proposed_recipients(monkeypatch):
     reply=client.post('/api/mailbox/review/'+token,json={'approve':True,'to':'attacker@evil.invalid'})
     assert reply.status_code==200 and reply.json['sent']['to']=='hr@northwind.example'
     assert client.post('/api/mailbox/review/'+token,json={'approve':True}).status_code==404
+
+
+def test_a_draft_to_a_lookalike_domain_the_user_typed_carries_a_warning():
+    # review-v2: the gate keeps what the user typed (outside -> confirm), so the
+    # draft reaches review; the reviewer must be told it is not our domain.
+    box,r=attempt('Email the leave rules to hr@northvvind.example.',
+                  [[('send_email',{'to':'hr@northvvind.example','subject':'Leave','body':'22 days'})]])
+    assert len(r['pending'])==1
+    ws=r['pending'][0]['warnings']
+    assert ws and ws[0]['address']=='hr@northvvind.example' and ws[0]['resembles']=='northwind.example'
+
+
+def test_a_draft_to_our_real_domain_carries_no_warning():
+    box,r=attempt('Email the leave rules to hr@northwind.example.',
+                  [[('send_email',{'to':'hr@northwind.example','subject':'Leave','body':'22 days'})]])
+    assert r['pending'][0]['warnings']==[]

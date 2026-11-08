@@ -210,14 +210,26 @@ class Playground:
         }
 
     def queue_review(self, args: dict, sink, gate: dict) -> dict:
-        """Freeze the exact proposed email outside the model's tool surface."""
+        """Freeze the exact proposed email outside the model's tool surface.
+
+        review-v2: the draft carries lookalike-domain warnings for the human,
+        computed from the company's own domains (defense/lookalike.py). The
+        reviewer is the target of that attack family; the warning is advisory
+        and changes no decision."""
+        from defense.lookalike import warnings_for
+
         token = secrets.token_urlsafe(24)
         saved = copy.deepcopy(args)
+        warnings = [
+            {"address": w.address, "resembles": w.resembles, "reason": w.reason}
+            for w in warnings_for([str(saved.get(f) or "") for f in ("to", "cc", "bcc")],
+                                  self.directory.internal_domains)
+        ]
         with self._review_lock:
             if len(self._pending_mail) >= 50:
                 raise PermissionError("Review or reject existing drafts before creating more.")
             self._pending_mail[token] = (saved, sink, copy.deepcopy(gate))
-        return {"id": token, **copy.deepcopy(saved)}
+        return {"id": token, **copy.deepcopy(saved), "warnings": warnings}
 
     def review(self, token: str, *, approve: bool) -> dict | None:
         """One user decision consumes one draft; the request cannot replace its bytes."""
@@ -481,7 +493,7 @@ class _LiveMail(MailBackend):
             # A trusted address is not permission to send. All protected sends
             # require a real decision outside the agent's tool surface.
             draft = next((x for x in run.pending_reviews
-                          if {k: v for k, v in x.items() if k != "id"} == final), None)
+                          if {k: v for k, v in x.items() if k not in ("id", "warnings")} == final), None)
             if draft is None:
                 draft = run.box.queue_review(final, run.sink,
                                             {"decision": entry["decision"], "reason": entry["reason"]})

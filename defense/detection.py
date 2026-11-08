@@ -50,7 +50,7 @@ import time
 from dataclasses import replace
 
 from agent.llm import QuotaExhausted
-from config import DETECTOR_MODEL, DETECTOR_PROVIDER
+from config import DETECTOR_MODEL, DETECTOR_PROVIDER, DETECTOR_SAMPLES
 from schema import DetectionResult, TaggedChunk
 
 _log = logging.getLogger(__name__)
@@ -117,12 +117,22 @@ class Detector:
     # Read by the Mailbox page to label the Detection switch.
     implemented = True
 
-    def __init__(self, provider=None, model: str = DETECTOR_MODEL, *, cache=None) -> None:
+    def __init__(self, provider=None, model: str = DETECTOR_MODEL, *, cache=None,
+                 samples: int = DETECTOR_SAMPLES) -> None:
         self._provider = provider
         self.model = model
         # Opt-in, so a Detector built in a test never touches disk; the runner
         # and the app pass the shared one (config.DETECTOR_CACHE_PATH).
         self.cache = cache
+        # detector-v3a+maxN: ask the model N times and keep the HIGHEST score.
+        # Temperature 0 is not determinism (PI-120 scored 0.60 then 0.05 on the
+        # same host within an hour), and a single low draw cached per text was
+        # replayed across all nine runs of that payload. Max-of-N damps the
+        # variance in the fail-closed direction: a payload must score low N
+        # times in a row to pass. Clean text keeps its margin only if its scores
+        # are stably low - which the dev set shows (0.02-0.05). N=1 is the
+        # pre-registered behaviour; the threshold is unchanged either way.
+        self.samples = max(1, int(samples))
 
     @property
     def provider(self):
@@ -140,10 +150,11 @@ class Detector:
 
     def scan(self, chunk: TaggedChunk) -> DetectionResult:
         started = time.monotonic()
-        # Keyed by host as well as model: the same open-weight model string is
-        # served by several hosts (Cerebras, Groq, Nous) and their scores differ
-        # (METHODOLOGY 5A), so a verdict from one must never stand in for another.
-        key = self.cache.key(chunk.text, DETECTOR_PROMPT_VERSION, f"{DETECTOR_PROVIDER}:{self.model}") if self.cache else None
+        # Keyed by host, model and sample count: the same open-weight model
+        # string is served by several hosts and their scores differ (METHODOLOGY
+        # 5A), and a single-draw verdict must not stand in for a max-of-N one.
+        tag = f"{DETECTOR_PROVIDER}:{self.model}" + (f":max{self.samples}" if self.samples > 1 else "")
+        key = self.cache.key(chunk.text, DETECTOR_PROMPT_VERSION, tag) if self.cache else None
         if key is not None:
             hit = self.cache.get(key)
             if hit is not None:
@@ -151,8 +162,7 @@ class Detector:
                 return DetectionResult(chunk.chunk_id, score, _label(score), 0, self.model,
                                        span=span or None, cached=True)
         try:
-            verdict = self.provider.classify(SYSTEM_PROMPT, _user_message(chunk.text), VERDICT_SCHEMA)
-            score, span, reason = _checked(verdict)
+            score, span, reason = self._sample(chunk)
         except QuotaExhausted:
             raise  # rule 2: stop the sweep; a rate limit is not a detection
         except Exception as exc:  # noqa: BLE001 - rule 1: any failure is a detection
@@ -166,6 +176,18 @@ class Detector:
 
     def scan_all(self, chunks: list[TaggedChunk]) -> list[DetectionResult]:
         return [self.scan(c) for c in chunks]
+
+    def _sample(self, chunk: TaggedChunk) -> tuple[float, str, str]:
+        """N independent verdicts; the highest score wins, with its span. Any
+        malformed answer raises, which scan() turns into a fail-closed verdict."""
+        best: tuple[float, str, str] | None = None
+        for _ in range(self.samples):
+            verdict = self.provider.classify(SYSTEM_PROMPT, _user_message(chunk.text), VERDICT_SCHEMA)
+            got = _checked(verdict)
+            if best is None or got[0] > best[0]:
+                best = got
+        assert best is not None
+        return best
 
 
 def redact(chunk: TaggedChunk, result: DetectionResult, *, threshold: float) -> TaggedChunk | None:

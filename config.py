@@ -92,6 +92,10 @@ AGENT_MAX_TOKENS: int = int(os.getenv("AGENT_MAX_TOKENS", "2048"))
 DETECTOR_MAX_TOKENS: int = int(os.getenv("DETECTOR_MAX_TOKENS", "1024"))
 # Sent only when non-empty, since not every endpoint accepts the parameter.
 DETECTOR_REASONING_EFFORT: str = os.getenv("DETECTOR_REASONING_EFFORT", "low")
+# Verdicts per excerpt; the highest score is kept (defense/detection.py). 1 is
+# the pre-registered single-call detector; 3 damps boundary variance. Costs N
+# detector calls per uncached excerpt.
+DETECTOR_SAMPLES: int = int(os.getenv("DETECTOR_SAMPLES", "1"))
 
 # ── Free-tier pacing ──────────────────────────────────────────────────────────
 # The budget is $0, so requests are spaced on our side to stay under the free
