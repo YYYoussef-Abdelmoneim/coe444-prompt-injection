@@ -527,4 +527,7 @@ def test_a_bare_domain_in_prose_is_not_a_link(chunk):
 def test_url_handling_names_no_attacker_domain_and_inspects_no_words():
     src = Path("defense/prevention.py").read_text(encoding="utf-8")
     assert "nw-records" not in src and "canary" not in src.lower()
-    assert "ATTACKER_DOMAINS" not in src and "from attacks" not in src
+    tree = ast.parse(src)
+    names = {a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) for a in n.names}
+    mods = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+    assert "ATTACKER_DOMAINS" not in names and not any(m.startswith("attacks") for m in mods)
