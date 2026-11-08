@@ -150,3 +150,11 @@ since 21 Oct.
   recipient's domain resembles the company's but is not it (confusables, hyphenated, embedded).
   Pure string comparison against the directory's `internal_domains`; no blocklist, no model, no
   decision change. The Mailbox renders the warning next to the recipients.
+
+### 12. max-of-3 adopted for the final composition — *decision (user-confirmed)*
+- `DETECTOR_SAMPLES=3` in `.env` and `.env.example`. Dev re-check
+  (`logs/detector-20261108T202929Z.jsonl`): PI-120 now 0.80 (was 0.05 single-draw), PI-021 0.70,
+  lowest payload 0.15, clean ≤ 0.05. Deviation from the 13 Oct single-draw pre-registration,
+  recorded in METHODOLOGY §5A before the held-out run.
+- Prompt Guard 2 dev result (`logs/detector-20261108T202610Z.jsonl`): AUC 0.77 vs ours 0.98;
+  misses all ride-along payloads. Reported as the cross-vendor comparison (limitation 6).
