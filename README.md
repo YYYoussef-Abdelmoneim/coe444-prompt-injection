@@ -34,8 +34,11 @@ source scripts/activate.sh    # each session
 python cli.py index           # once, or after editing rag/documents/
 ```
 
-Then add `GROQ_API_KEY` (the agent, `openai/gpt-oss-20b` on Groq) and
-`CEREBRAS_API_KEY` (the detector's model, `gpt-oss-120b`) to `.env`.
+Then add `GROQ_API_KEY` to `.env`. Both models run on Groq: the agent is
+`openai/gpt-oss-20b` and the detector is `openai/gpt-oss-120b`. (The detector
+ran on Cerebras until 8 Nov 2026, when that free tier was withdrawn; see
+METHODOLOGY.md section 5A. `CEREBRAS_API_KEY` is only needed to reproduce the
+older logs.)
 
 Two modes. `setup.sh` uses the external drive if `/Volumes/Segate.Y` is mounted
 and the project directory otherwise; force one with `MODE=local ./scripts/setup.sh`.
