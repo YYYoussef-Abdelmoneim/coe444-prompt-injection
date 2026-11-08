@@ -25,6 +25,7 @@ def _chunk(text="Annual leave is 22 days.", chunk_id="doc::0"):
 
 def _detector(verdict, **kw):
     fake = FakeProvider(default_verdict=verdict)
+    kw.setdefault("samples", 1)  # single draw: these tests check one call's shape
     return Detector(provider=fake, model="fake", **kw), fake
 
 

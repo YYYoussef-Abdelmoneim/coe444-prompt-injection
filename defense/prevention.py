@@ -80,7 +80,9 @@ _log = logging.getLogger(__name__)
 # Recorded in every RunRecord. gate-stub-v0 allowed everything; provenance-v1
 # and -v2 (unmerged) trusted a static contact list; gate-v1 stripped and denied.
 # gate-v2 (8 Nov 2026) adds the user-typed repair of an emptied `to`.
-POLICY_VERSION = "gate-v2"
+# gate-v3 (8 Nov 2026) attributes URLs in subject/body like recipients and
+# removes those whose host traces to neither the user nor a company domain.
+POLICY_VERSION = "gate-v3"
 
 # A dot-atom local part and a dotted domain: deliberately narrower than RFC 5322.
 # A quoted local part ('"audit"@x.invalid') or a source route ('@a.invalid:b@c')
@@ -93,6 +95,24 @@ _IN_TEXT = re.compile(rf"(?<![\w.+-])({_ADDR})")
 _BARE = re.compile(rf"({_ADDR})")
 _NAMED = re.compile(rf"[^<>@\"]*<\s*({_ADDR})\s*>")
 _SEPARATORS = re.compile(r"[,;\n]")
+# gate-v3: URLs in CONTENT fields. Scheme required, so a bare domain in prose
+# ("see northwind.example") is left alone; only something a client would fetch.
+_URL = re.compile(r"https?://[^\s<>()\[\]\"']+", re.IGNORECASE)
+
+
+def _host_of(url: str) -> str | None:
+    try:
+        rest = url.split("://", 1)[1]
+    except IndexError:
+        return None
+    host = rest.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    host = host.rsplit("@", 1)[-1].split(":", 1)[0].lower().rstrip(".")
+    return host or None
+
+
+def _hosts(text: str) -> set[str]:
+    """Hosts of URLs the user themselves typed."""
+    return {h for h in (_host_of(u) for u in _URL.findall(text or "")) if h}
 
 _KEEP, _CONFIRM, _STRIP = "keep", "confirm", "strip"
 
@@ -160,6 +180,23 @@ class ProvenanceGate:
             else:
                 del sanitized[name]
 
+        # gate-v3: a URL inside a CONTENT field is a destination too. Whoever
+        # receives the email may click or auto-fetch it, and anything after '?'
+        # travels to that host. So every URL in subject/body is attributed like
+        # a recipient: its host must trace to the user's own words or to a
+        # company domain; otherwise the URL (only the URL) is removed. The
+        # surrounding text is untouched. No judgement about what the URL says.
+        typed_hosts = _hosts(user_prompt)
+        for name, value in call.arguments.items():
+            if not isinstance(value, str) or field_class(call.tool_name, name) is not FieldClass.CONTENT:
+                continue
+            kept_text, removed = self._strip_foreign_urls(value, typed_hosts)
+            if removed:
+                sanitized[name] = kept_text
+                for url in removed:
+                    stripped.append(url)
+                    provenance.append(FieldProvenance(name, FieldClass.CONTENT, Origin.EXTERNAL, None, url))
+
         decision, reason, repaired = self._decide(unrepairable, stripped, confirm, sanitized, restored)
         _log.info("gate %s %s %s stripped=%s restored=%s confirm=%s",
                   POLICY_VERSION, call.call_id, decision.value, stripped, restored, confirm)
@@ -201,6 +238,27 @@ class ProvenanceGate:
         if internal and support is not None:
             return _CONFIRM, prov
         return _STRIP, prov
+
+    def _strip_foreign_urls(self, text: str, typed_hosts: set[str]) -> tuple[str, list[str]]:
+        """Remove every URL whose host is neither one the user typed nor a
+        company domain. Returns (text, removed urls)."""
+        removed: list[str] = []
+
+        def keep_or_cut(m: re.Match) -> str:
+            url = m.group(0)
+            host = _host_of(url)
+            if host is None:
+                removed.append(url)
+                return "[link removed by the security gate]"
+            if host in typed_hosts or self._is_internal_host(host):
+                return url
+            removed.append(url)
+            return "[link removed by the security gate]"
+
+        return _URL.sub(keep_or_cut, text), removed
+
+    def _is_internal_host(self, host: str) -> bool:
+        return any(host == d or host.endswith("." + d) for d in self.internal_domains)
 
     @staticmethod
     def _decide(
