@@ -44,9 +44,9 @@ The default main branch includes the reviewed progress code and team materials. 
 - The assistant, document search, contact lookup, detector, recipient gate and simulated mailbox are implemented.
 - With prevention ON in the live mailbox, surviving email drafts wait for a real approval or rejection. The model cannot approve its own drafts through its tools. This is additional live protection, outside the old scoring protocol.
 - Document retrieval defaults to one native thread to avoid the locally reproduced startup crash. Local retrieval passed with this setting.
-- The updated suite has 256 passing checks, including all 61 original defense specification checks.
+- The suite has 338 passing checks (`make test`), including all defense specification checks. (Was 256 at the progress report.)
 - There are 223 stored attack examples: 23 custom examples (10 development and 13 held out) plus 200 external examples.
-- The old main comparison uses ten development attacks and seven normal tasks, each repeated three times. Its attack-success results are A 60%, B 10%, C 30%, D 10%.
+- The progress-report comparison (13 Oct, abort-based design) used ten development attacks and seven normal tasks ×3: A 60% (70% re-scored with scorer-v2), B 10%, C 30% (40%), D 10%. Current development results under the frozen stack: dev A 70% → D 0%, advanced (18 new attacks) A 71% → D 0%, benign 100%. See `results/frozen_stack_summary.md` and `docs/CHANGELOG_FINAL.md` for everything that changed and why.
 - A separate saved agent experiment covers 50 external examples. A separate detector check covers 50 attack excerpts and 203 clean emails.
 - These are preliminary historical results. They do not establish the final below-5% target or measure the new review flow.
 - Fresh hosted-model checks, a full rehearsal and final held-out evaluation remain pending.

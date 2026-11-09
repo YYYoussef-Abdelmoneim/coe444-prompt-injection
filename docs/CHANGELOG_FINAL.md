@@ -308,3 +308,12 @@ accepting the residual)*
   the mail went to finance; **C live: gate stripped the swap and restored finance (blocked_task_ok)**
   — the case shadow-C scored as broken on 13 Oct; D ok. BN-040 ok ×4.
 - **Waiting on the user's explicit "final" to run the held-out split.**
+
+### 24. Held-out run launched; stale docs fixed — *in progress*
+- **Held-out run started 2026-11-09 07:28 UTC** on the user's explicit "final":
+  `cli.py eval-live --split test --live B,C,D --final`, commit `a2efb9f`, log
+  `logs/live-20261109T072833Z.jsonl`. First records verified: split=test, hosts nous/nous, samples 3,
+  gate-v3.1. 240 executions expected.
+- README (hosts, commands, status), TEAM_START_HERE (counts, results), `.env.example` (Nous block,
+  provider defaults) brought in line with METHODOLOGY — the rubric audit found them contradicting it
+  (README said Groq; TEAM_START_HERE said 256 checks and D 10 %).

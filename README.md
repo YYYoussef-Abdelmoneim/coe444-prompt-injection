@@ -34,11 +34,15 @@ source scripts/activate.sh    # each session
 python cli.py index           # once, or after editing rag/documents/
 ```
 
-Then add `GROQ_API_KEY` to `.env`. Both models run on Groq: the agent is
-`openai/gpt-oss-20b` and the detector is `openai/gpt-oss-120b`. (The detector
-ran on Cerebras until 8 Nov 2026, when that free tier was withdrawn; see
-METHODOLOGY.md section 5A. `CEREBRAS_API_KEY` is only needed to reproduce the
-older logs.)
+Then add `NOUS_API_KEY` to `.env`. Both models run on the Nous Research
+inference API (OpenAI-compatible): the agent is `openai/gpt-oss-20b` and the
+detector is `openai/gpt-oss-120b`, asked three times per excerpt with the
+highest score kept (`DETECTOR_SAMPLES=3`). Every record logs which host served
+each model (`agent_host`, `detector_host`, `detector_samples`). The history of
+hosts — Cerebras until 8 Nov 2026 (free tier withdrawn), Groq for a few hours
+(daily cap), Nous since — is in METHODOLOGY.md section 5A; `GROQ_API_KEY` is
+needed only for the Prompt Guard 2 comparison arm, `CEREBRAS_API_KEY` only to
+reproduce October logs.
 
 Two modes. `setup.sh` uses the external drive if `/Volumes/Segate.Y` is mounted
 and the project directory otherwise; force one with `MODE=local ./scripts/setup.sh`.
@@ -58,10 +62,11 @@ python interface/app.py              # web UI: http://127.0.0.1:5000 (Mailbox) a
 python cli.py index                  # build the FAISS index over rag/documents/
 python cli.py ask "What is the leave policy?"
 python cli.py demo PI-101            # one attack, all four conditions, side by side
-python cli.py eval                   # dev-split sweep; the held-out test split runs once, via make eval
-python cli.py rescore logs/run-*.jsonl --threshold 0.3   # re-score a raw run log, no API call
-python cli.py report logs/scored-*.jsonl   # recompute metrics from an existing log
-make test                            # framework tests, no live API calls
+python cli.py eval-live --split dev  # dev sweep, defenses in the loop (composition-v2); advanced: --split advanced
+make eval-live-final                 # the held-out test split, once, live B,C,D (asks for "final")
+python cli.py rescore-live logs/live-*.jsonl [--write]   # re-score a live log, no API call
+python cli.py detector-eval [--external] [--promptguard]  # detector on dev / Microsoft LLMail excerpts
+make test                            # all 338 checks incl. the defense specs, no live API calls
 make spec-detection                  # the detection teammate's requirements
 make spec-prevention                 # the prevention teammate's requirements
 make check-independence              # the two defense layers must not reference each other
@@ -79,8 +84,8 @@ The **Lab** page and `python cli.py demo` are the research view: the agent runs
 once with both defenses observing, and that one run is scored under A/B/C/D.
 Reported numbers come only from `make eval` logs.
 
-Cerebras rate-limits bursts (about 4 requests, then a 60-second wait on HTTP
-429), so a detector that makes one call per excerpt makes runs slow.
+Reported numbers come only from `logs/*.jsonl`; `docs/CHANGELOG_FINAL.md` is the
+dated record of every change since the progress report and why it was made.
 
 ## Layout
 
@@ -151,12 +156,17 @@ red-teaming a system we built and own.
 
 ## Status
 
-Foundation complete: agent (Groq), RAG with origin tagging, the corpus, the
-runner, metrics, the Mailbox and Lab pages, and spec tests for both defenses.
-Detection and prevention are implemented. The final test-split evaluation is
-still pending. See `docs/PROGRESS_EVIDENCE.md` for counts and historical results.
-The October 13 A/B/C/D figures describe offline shadow scoring of gate-v1, not the
-new explicit-review live path. Do not reuse them as measurements of the new path.
+Complete as of 9 Nov 2026 (`METHODOLOGY.md` §5A, `docs/CHANGELOG_FINAL.md`):
+agent-v3 with an inbox channel; sanitize-v1 → detector-v3a (max-of-3) → gate-v3.1
+→ human review; composition-v2 (defenses in the loop, B/C/D executed live);
+corpus v0.2.1 (dev + sealed test) and v0.3-advanced (18 attacks in 9 realistic
+families); scorer-v2. Development results (`results/frozen_stack_summary.md`,
+re-scored): dev A 70 % → D 0 % (0/30 trials), advanced A 71 % → D 0 % (0/52),
+benign 100 % everywhere; external Microsoft LLMail excerpts: detector FNR 5/50,
+FPR 0/203. The held-out test split is the one confirmatory run
+(`results/final_test_summary.md` once it exists). The October 13 figures (A 60 %
+as presented / 70 % re-scored, D 10 %) describe the abort-based gate-v1 design
+and are kept as the before-picture.
 
 Document retrieval defaults to `OMP_NUM_THREADS=1` before native libraries load,
 following a reproduced macOS crash and a successful single-thread retrieval check.
