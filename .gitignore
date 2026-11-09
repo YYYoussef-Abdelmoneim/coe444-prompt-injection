@@ -33,6 +33,9 @@ logs/*.jsonl
 !logs/detector-20261108T202929Z.jsonl
 # 9 Nov: scorer-v2 re-scores of every live log (originals kept as 8 Nov evidence).
 !logs/scored-live-*-scorer-v2.jsonl
+# 9 Nov: smoke of the frozen confirmatory stack, live B,C,D (METHODOLOGY 5A 2026-11-09).
+!logs/live-20261109T072528Z.jsonl
+!logs/scored-live-20261109T072528Z.jsonl
 # composition-v2 live logs (evaluation/live.py).
 !logs/live-20261108T181653Z.jsonl
 !logs/scored-live-20261108T181653Z.jsonl

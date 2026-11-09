@@ -51,4 +51,4 @@ eval-live-dev:
 eval-live-final:
 	@echo "This runs the HELD-OUT test split under composition-v2 — once, at the end."
 	@read -p "Type 'final' to continue: " ans; [ "$$ans" = final ] || { echo "aborted"; exit 1; }
-	caffeinate -i python cli.py eval-live --split test --final
+	caffeinate -i python -B cli.py eval-live --split test --live B,C,D --final
