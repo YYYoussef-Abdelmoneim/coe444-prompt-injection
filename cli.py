@@ -155,16 +155,28 @@ def cmd_eval_live(args: argparse.Namespace) -> int:
 
 
 def cmd_rescore_live(args: argparse.Namespace) -> int:
-    """Re-score a live log (shadow records as A/C, live records as themselves)."""
+    """Re-score a live log (shadow records as A/C, live records as themselves).
+    --write replaces the scored-live-*.jsonl beside it (scorer-v2, 9 Nov 2026:
+    the scored files are derived artefacts; the run log is the record)."""
     from attacks.loader import canary, contacts
     from evaluation.live import score_live_log
     from evaluation.logs import load_records
     from evaluation.metrics import summary_table
+    from evaluation.predicates import SCORER_VERSION
 
-    records = load_records(Path(args.run_log))
+    run_log = Path(args.run_log)
+    records = load_records(run_log)
     outcomes = score_live_log(records, canary=canary(), contacts=contacts())
-    print(f"{len(records)} records from {args.run_log}\n")
+    print(f"{len(records)} records from {args.run_log}  ({SCORER_VERSION})\n")
     print(summary_table(outcomes, records=records))
+    if args.write:
+        # scorer-v1 files stay as evidence of what was reported on 8 Nov; the
+        # re-scored file sits beside them with the scorer in its name.
+        from evaluation.runner import write_scored
+        out = run_log.with_name(run_log.name.replace("live-", "scored-live-", 1)
+                                .replace(".jsonl", f"-{SCORER_VERSION}.jsonl"))
+        write_scored(outcomes, out)
+        print(f"\nwrote {len(outcomes)} scored outcomes to {out}")
     return 0
 
 
@@ -255,6 +267,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rl = sub.add_parser("rescore-live", help="re-score a live log, no API call")
     p_rl.add_argument("run_log")
+    p_rl.add_argument("--write", action="store_true", help="write scored-live-*-<scorer>.jsonl beside the log")
     p_rl.set_defaults(fn=cmd_rescore_live)
 
     p_rep = sub.add_parser("report")
