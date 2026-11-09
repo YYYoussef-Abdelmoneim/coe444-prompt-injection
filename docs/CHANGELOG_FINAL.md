@@ -285,3 +285,14 @@ accepting the residual)*
 - **Replay.** Every `send_email` decision in the two frozen sweeps re-evaluated offline with
   gate-v3.1 against the logged prompt and chunks: **163/163 identical** (decision and sanitized
   arguments). No corpus prompt quotes an address; the bug could only have hit a live demo question.
+
+### 21. Experiment provenance in every record — *implemented, tested*
+- `schema.py` RunRecord `+agent_host`, `+detector_host`, `+detector_samples`; both runners stamp
+  them from config; `_check_resumable` refuses to extend a log whose host or draw count differs
+  (including pre-9-Nov logs, which have empty fields). 5 tests (`tests/test_provenance_fields.py`).
+- The final run will stamp `agent_host=nous, detector_host=nous, detector_samples=3`.
+
+### 22. `make test` runs the spec suite — *fixed, measured*
+- Before: `make test` → 264 passed, **74 skipped** (every gate and detector fail-closed spec test
+  silently skipped without `--spec`). After: **338 passed, 0 skipped**. README's instruction is now
+  true.

@@ -58,7 +58,8 @@ from conditions import (
     Condition,
     is_flagged,
 )
-from config import AGENT_MODEL, AGENT_PROVIDER, DETECTOR_MODEL, LOG_DIR, SAMPLING, TRIALS_PER_TASK
+from config import (AGENT_MODEL, AGENT_PROVIDER, DETECTOR_MODEL, DETECTOR_PROVIDER, DETECTOR_SAMPLES, LOG_DIR,
+                    SAMPLING, TRIALS_PER_TASK)
 from defense.detection import DETECTOR_PROMPT_VERSION, redact
 from defense.prevention import POLICY_VERSION
 from defense.sanitize import SANITIZE_VERSION, sanitize_chunk
@@ -361,6 +362,9 @@ class LiveRunner:
             paired_run_id=paired,
             sanitize_actions=list(state.sanitize_actions),
             sanitize_version=SANITIZE_VERSION,
+            agent_host=AGENT_PROVIDER,
+            detector_host=DETECTOR_PROVIDER,
+            detector_samples=DETECTOR_SAMPLES,
             inbox=inbox.as_log(),
         )
 

@@ -308,6 +308,13 @@ class RunRecord:
     # agent-v3: the inbox the agent could read in this run, as the attacker
     # channel. Each item is {"id","sender","subject","body","planted": bool}.
     inbox: list[dict[str, Any]] = field(default_factory=list)
+    # 9 Nov 2026 (review M3): which host served each model and how many detector
+    # draws were taken. The same open-weight model string scores differently per
+    # host, and a single-draw verdict is not a max-of-3 one; without these a
+    # resumed sweep could silently mix them. Empty in records before this date.
+    agent_host: str = ""
+    detector_host: str = ""
+    detector_samples: int = 0
 
     @property
     def pairing_key(self) -> str:

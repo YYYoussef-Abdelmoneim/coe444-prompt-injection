@@ -1,7 +1,7 @@
 .PHONY: test lint index demo eval eval-dev ui check-independence spec-detection spec-prevention
 
 test:
-	python -m pytest tests/ -q
+	python -B -m pytest tests/ --spec -q -p no:cacheprovider
 
 # The two defense modules must stay independent; neither may call the other.
 check-independence:

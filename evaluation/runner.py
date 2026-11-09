@@ -32,6 +32,8 @@ from config import (
     SAMPLING,
     DETECTOR_CACHE_PATH,
     DETECTOR_MODEL,
+    DETECTOR_PROVIDER,
+    DETECTOR_SAMPLES,
     LOG_DIR,
     TRIALS_PER_TASK,
 )
@@ -226,6 +228,9 @@ class Runner:
             turns=run.turns,
             sanitize_actions=sanitize_actions,
             sanitize_version=SANITIZE_VERSION,
+            agent_host=AGENT_PROVIDER,
+            detector_host=DETECTOR_PROVIDER,
+            detector_samples=DETECTOR_SAMPLES,
             inbox=inbox.as_log(),
         )
         record._item = item  # type: ignore[attr-defined]
@@ -252,6 +257,10 @@ def _check_resumable(records: list[RunRecord], split: str, path: Path) -> None:
         "agent_model": AGENT_MODEL,
         "detector_model": DETECTOR_MODEL,
         "sampling": SAMPLING,
+        # 9 Nov: host and draw count are part of what "the same detector" means.
+        "agent_host": AGENT_PROVIDER,
+        "detector_host": DETECTOR_PROVIDER,
+        "detector_samples": DETECTOR_SAMPLES,
     }
     for rec in records:
         for name, now in current.items():
