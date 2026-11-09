@@ -39,6 +39,8 @@ logs/*.jsonl
 # 9 Nov: THE held-out confirmatory run (results/final_test_summary.md). Run once.
 !logs/live-20261109T072833Z.jsonl
 !logs/scored-live-20261109T072833Z.jsonl
+# 9 Nov: direct-injection exploratory probe (results/direct_probe.md).
+!logs/direct-probe-20261109T092742Z.jsonl
 # composition-v2 live logs (evaluation/live.py).
 !logs/live-20261108T181653Z.jsonl
 !logs/scored-live-20261108T181653Z.jsonl
