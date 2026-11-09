@@ -339,3 +339,23 @@ accepting the residual)*
 - Framing adopted: user-typed bytes are trusted by design (provenance cannot tell a malicious user from
   a legitimate one); the composition's answer to a hostile *user* is the review step, not the detector,
   which never sees the user turn. Answers the instructor's second comment with data, n stated.
+
+### 27. Figures, report, deck — *built, verified*
+- `scripts/make_figures.py` → `results/fig_asr_conditions.png` (4 sweeps × 4 conditions, Wilson
+  bars, n/N labels), `fig_per_payload.png` (held-out + advanced heatmaps), `fig_detector_roc.png`
+  (ours on dev and LLMail, Prompt Guard 2, keyword baseline); `scripts/make_architecture.py` →
+  `fig_architecture.png`. All from logs; each inspected visually, two layout defects in the
+  architecture figure fixed (dashed origin-tag line crossed two boxes; re-routed).
+- **Report** `docs/final/COE444_Final_Report.docx` from `docs/final/report_spec.json` (template
+  structure: Problem Formulation → Proposed Solution → Outcomes → Conclusion incl. CLO10/CLO11 →
+  IEEE references). ~3 600 words + 4 figures + 1 table ≈ 8 pages (cap 10). Every number traceable
+  to a named log; the deviation from the proposal ("train Llama" → prompted judge) stated in §1.2;
+  §3.4 is the self-review and its corrections; "not refuted / not demonstrated" wording throughout.
+- **Deck** `docs/final/COE444_Final_Presentation.pptx` built on the instructor's template
+  (`scripts/make_deck.py`), five presenters in proposal order, speaker notes per slide with timing
+  and the exact words for the hard points (PI-105, PI-022, "not demonstrated"). Rendered with
+  `scripts/render_pptx.py` (approximate, no LibreOffice on this machine) and checked slide by slide
+  for overflow; three overflows fixed (slide 2 right column, slide 3 presenter line, slide 5
+  columns).
+- Old PNGs (`results/asr_by_condition.png`, `gate_decisions.png`, `roc_dev.png`) are the gate-v1
+  era and are superseded by `fig_*`.
