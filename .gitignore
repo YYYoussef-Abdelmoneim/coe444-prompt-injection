@@ -36,6 +36,9 @@ logs/*.jsonl
 # 9 Nov: smoke of the frozen confirmatory stack, live B,C,D (METHODOLOGY 5A 2026-11-09).
 !logs/live-20261109T072528Z.jsonl
 !logs/scored-live-20261109T072528Z.jsonl
+# 9 Nov: THE held-out confirmatory run (results/final_test_summary.md). Run once.
+!logs/live-20261109T072833Z.jsonl
+!logs/scored-live-20261109T072833Z.jsonl
 # composition-v2 live logs (evaluation/live.py).
 !logs/live-20261108T181653Z.jsonl
 !logs/scored-live-20261108T181653Z.jsonl
