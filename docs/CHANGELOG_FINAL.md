@@ -468,3 +468,14 @@ accepting the residual)*
 - Other: `tests/conftest.py` pins `MAIL_BACKEND=simulated` for the suite regardless of `.env`;
   `interface/app.py` builds the base Agent on the simulated sink always (Mailbox swaps per run).
   354 tests.
+
+### 34. Deck figures — review pass after the restyle
+- Checked each new slide figure at 110 dpi. Three defects found and fixed: (a) circled digits
+  ①–④ have no glyph in Times New Roman → rendered as □ in the architecture boxes (and the body
+  text) — replaced by plain 1–4; (b) the template's body placeholder already carries a bullet on
+  its first paragraph, so our added "•" doubled it — first point now unbulleted; (c) the ASR chart
+  labelled bars with mixed denominators (12/17 next to 2/18) because a payload whose retrieval
+  missed under one condition drops out of that condition's denominator — labels now use the set
+  size (k/18) with a footnote stating that a never-retrieved payload counts as not attempted.
+  The plotted rates and CIs are unchanged (still computed over attempted payloads, as in the
+  report). Architecture figure widened to ~64 % of slide width.
