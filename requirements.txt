@@ -3,7 +3,7 @@
 # lives on an external drive.
 
 anthropic>=1.7,<2          # optional: only the reproducible Claude arm uses it
-openai>=1.109,<2          # agent + detector via the Cerebras OpenAI-compatible API
+openai>=1.109,<2          # agent + detector via any OpenAI-compatible host (Nous since 8 Nov 2026)
 sentence-transformers==3.4.1
 faiss-cpu==1.11.0
 python-dotenv==1.1.0
@@ -42,3 +42,8 @@ flask==3.1.0
 #       a secondary source at best. Add it back if and when it is actually used.
 #   ollama
 #       No local model is being run; the detector is behind an HTTP provider.
+
+# Deliverable builders only (scripts/make_deck.py, docs/final/report_spec.json via the
+# docx helper, scripts/render_pptx.py). Not imported by the agent, defenses or evaluation.
+python-docx==1.2.0
+python-pptx==1.0.2
