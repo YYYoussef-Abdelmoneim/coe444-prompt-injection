@@ -209,13 +209,21 @@ class Playground:
             "left_company": [r.strip() for r in recipients if _outside_company(r)],
         }
 
-    def queue_review(self, args: dict, sink, gate: dict) -> dict:
+    def queue_review(self, args: dict, sink, gate: dict, *, proposed: dict | None = None,
+                     defenses_did: list[dict] | None = None) -> dict:
         """Freeze the exact proposed email outside the model's tool surface.
 
         review-v2: the draft carries lookalike-domain warnings for the human,
-        computed from the company's own domains (defense/lookalike.py). The
-        reviewer is the target of that attack family; the warning is advisory
-        and changes no decision."""
+        computed from the company's own domains (defense/lookalike.py).
+
+        review-v3 (9 Nov 2026, from the user's own review of the demo): the
+        human is the authority, not the gate. The draft therefore also carries
+        (a) what the defenses did - every sentence the detector cut and every
+        recipient the gate stripped - so the person decides with the facts,
+        and (b) the agent's ORIGINAL proposal, so the person can override the
+        defenses and send it as proposed. An override is allowed and audited:
+        review() sends a notice to the company's security contact and marks
+        the sent entry. Resilience by visibility, not by refusal."""
         from defense.lookalike import warnings_for
 
         token = secrets.token_urlsafe(24)
@@ -225,27 +233,75 @@ class Playground:
             for w in warnings_for([str(saved.get(f) or "") for f in ("to", "cc", "bcc")],
                                   self.directory.internal_domains)
         ]
+        original = copy.deepcopy(proposed) if proposed is not None else None
+        did = list(defenses_did or [])
+        changed = original is not None and {k: v for k, v in original.items() if v} != {k: v for k, v in saved.items() if v}
         with self._review_lock:
             if len(self._pending_mail) >= 50:
                 raise PermissionError("Review or reject existing drafts before creating more.")
-            self._pending_mail[token] = (saved, sink, copy.deepcopy(gate))
-        return {"id": token, **copy.deepcopy(saved), "warnings": warnings}
+            self._pending_mail[token] = (saved, sink, copy.deepcopy(gate), original if changed else None, did)
+        return {"id": token, **copy.deepcopy(saved), "warnings": warnings,
+                "defenses_did": did, "original": original if changed else None,
+                "suspicious": bool(did or warnings or gate.get("decision") in ("confirm", "sanitize"))}
 
-    def review(self, token: str, *, approve: bool) -> dict | None:
-        """One user decision consumes one draft; the request cannot replace its bytes."""
+    def security_contact(self) -> str:
+        """Where override notices go: the directory's security role, else the manager."""
+        for role in ("security", "manager"):
+            hit = [e for e in self.directory.entries if e.role == role]
+            if hit:
+                return hit[0].email
+        return f"security@{sorted(self.directory.internal_domains)[0]}"
+
+    def review(self, token: str, *, approve: bool, override: bool = False) -> dict | None:
+        """One user decision consumes one draft; the request cannot replace its bytes.
+
+        review-v3: `override=True` sends the agent's ORIGINAL proposal (before
+        the defenses changed it) instead of the filtered draft. Any override,
+        and any approval of a draft the defenses marked suspicious, also sends
+        a notice to the security contact. The notice is a real message in the
+        same mail backend, so the demo shows it in the sent folder."""
         if type(approve) is not bool:
             raise ValueError("approve must be a boolean")
         with self._review_lock:
-            args, sink, gate = self._pending_mail.pop(token)
+            args, sink, gate, original, did = self._pending_mail.pop(token)
         if not approve:
             return None
-        sink.send(to=args["to"], subject=args.get("subject", ""), body=args.get("body", ""),
-                  cc=args.get("cc"), bcc=args.get("bcc"))
+        if override and original is None:
+            override = False     # nothing was changed; an "override" is a plain approval
+        final = original if override else args
+        sink.send(to=final["to"], subject=final.get("subject", ""), body=final.get("body", ""),
+                  cc=final.get("cc"), bcc=final.get("bcc"))
         gate["approval"] = {"simulated": False, "approved": True, "by": EMPLOYEE["address"],
-                            "at": _now()}
-        entry = self._sent_entry(args, via="assistant", gate=gate)
+                            "at": _now(), "override": override}
+        entry = self._sent_entry(final, via="assistant", gate=gate)
+        entry["override"] = override
         self.sent.insert(0, entry)
+        suspicious = bool(did or gate.get("decision") in ("confirm", "sanitize") or entry["left_company"])
+        if override or suspicious:
+            notice = self._security_notice(final, did, override, entry)
+            sink.send(to=notice["to"], subject=notice["subject"], body=notice["body"])
+            nentry = self._sent_entry(notice, via="security-notice", gate=None)
+            nentry["notice_for"] = entry["id"]
+            self.sent.insert(0, nentry)
+            entry["security_notice"] = nentry["id"]
         return entry
+
+    def _security_notice(self, final: dict, did: list[dict], override: bool, entry: dict) -> dict:
+        what = "\n".join(f"  - {d.get('layer', 'defense')}: {d.get('what', '')}" for d in did) or "  - (nothing was removed)"
+        recipients = ", ".join(x for x in (final.get("to"), final.get("cc"), final.get("bcc")) if x)
+        head = ("OVERRIDE: the user sent an email AS ORIGINALLY PROPOSED, discarding what the defenses removed."
+                if override else
+                "The user approved an email that the defenses had flagged or changed.")
+        return {
+            "to": self.security_contact(),
+            "subject": f"[Assistant security notice] {'Override' if override else 'Flagged send approved'} by {EMPLOYEE['name']}",
+            "body": (f"{head}\n\nUser: {EMPLOYEE['name']} <{EMPLOYEE['address']}>\n"
+                     f"Sent to: {recipients}\nSubject: {final.get('subject', '')}\n\n"
+                     f"What the defenses had done before the user's decision:\n{what}\n\n"
+                     f"Addresses outside the company: {', '.join(entry['left_company']) or 'none'}\n"
+                     f"Time: {_now()}\n\nThis notice is automatic. No action is blocked; it is recorded so an unusual "
+                     f"send is visible to a second person."),
+        }
 
     # ── Documents ────────────────────────────────────────────────────────────
 
@@ -493,10 +549,29 @@ class _LiveMail(MailBackend):
             # A trusted address is not permission to send. All protected sends
             # require a real decision outside the agent's tool surface.
             draft = next((x for x in run.pending_reviews
-                          if {k: v for k, v in x.items() if k not in ("id", "warnings")} == final), None)
+                          if {k: v for k, v in x.items()
+                              if k not in ("id", "warnings", "defenses_did", "original", "suspicious")} == final), None)
             if draft is None:
+                did: list[dict[str, Any]] = []
+                for c in run.read:
+                    det = c.get("detection") or {}
+                    if c.get("redacted") and det.get("span"):
+                        did.append({"layer": "detector", "chunk_id": c["chunk_id"], "score": det.get("score"),
+                                    "what": f"cut from {c['chunk_id']}: \"{det['span']}\""})
+                    elif c.get("withheld"):
+                        did.append({"layer": "detector", "chunk_id": c["chunk_id"], "score": det.get("score"),
+                                    "what": f"withheld the whole excerpt {c['chunk_id']} (score {det.get('score')})"})
+                for f in ("to", "cc", "bcc"):
+                    before = [a.strip() for a in str(args.get(f) or "").split(",") if a.strip()]
+                    after = str(final.get(f) or "").lower()
+                    for a in before:
+                        if a.lower() not in after:
+                            did.append({"layer": "gate", "field": f, "what": f"stripped {f.upper()} {a}: {entry['reason']}"})
+                if d.sanitized and str(final.get("body", "")) != str(args.get("body", "")):
+                    did.append({"layer": "gate", "field": "body", "what": "removed a link in the body whose host is neither yours nor the company's"})
                 draft = run.box.queue_review(final, run.sink,
-                                            {"decision": entry["decision"], "reason": entry["reason"]})
+                                            {"decision": entry["decision"], "reason": entry["reason"]},
+                                            proposed=dict(args), defenses_did=did)
                 run.pending_reviews.append(draft)
             entry["sent"] = None
             entry["pending_id"] = draft["id"]

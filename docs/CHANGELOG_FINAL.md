@@ -385,3 +385,24 @@ accepting the residual)*
   (`docs/final/COE444_Final_Report.pdf`, `COE444_Final_Presentation.pdf`).
 - GitHub: pushed `5cbfc51 → 5fb9907` after the user authenticated as the repo owner; origin/main
   now equals local.
+
+### 30. review-v3 — the human is the authority: transparency + audited override — *implemented, verified live*
+- **Trigger (user, reviewing the demo):** the review panel showed a clean draft without saying what
+  had been removed; the user asked that the person be shown the removed material, be allowed to send
+  anyway, and that an unusual send notify a second person.
+- **What.** `interface/playground.py` `queue_review()` now carries `defenses_did` (every detector
+  cut with its score and every gate-stripped recipient/link), the agent's `original` proposal when
+  it differs, and `suspicious`. `review(..., override=True)` sends the original instead of the
+  filtered draft. Any override, or approval of a flagged draft, sends an automatic notice to the
+  directory's security contact (`security@northwind.example`, falls back to the manager) through the
+  same mail backend, tagged `security-notice`; the sent entry is tagged `USER OVERRODE DEFENSES`.
+  `/api/mailbox/review` accepts `override`; the Mailbox shows the removed items, a collapsible
+  "exactly as the assistant proposed", a third button "Send as the assistant proposed (override
+  defenses)" with a confirm, and the notice after sending. Nothing is blocked; it is made visible.
+- 5 new tests (approve-flagged → notice; override → original sent + OVERRIDE notice; clean draft →
+  no notice; override on unchanged draft = approval; reject → nothing). 343 total.
+- Verified in the browser: inbox demo with prevention only → panel lists "gate stripped BCC
+  records@nw-partner.invalid"; override → mail went WITH the BCC, sent folder shows it tagged, plus
+  the security notice to security@ with the full account. With detection on, the panel lists the cut
+  sentence from `inbox::m8` and there is no override button (nothing in the draft changed).
+- CLO10 made concrete: recovery = a second person sees the unusual send within seconds.

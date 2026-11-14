@@ -445,9 +445,10 @@ function whyItFailed(r) {
   return 'No defense had to act: the model did not obey the planted text this time.';
 }
 
-async function reviewDraft(token, approve) {
+let LAST_NOTICE = null;   // review-v3: the security notice produced by the last approval, if any
+async function reviewDraft(token, approve, override) {
   const r = await fetch('/api/mailbox/review/' + encodeURIComponent(token), {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({approve})
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({approve, override: !!override})
   });
   const data = await r.json();
   if (!r.ok) { alert(data.error || 'Review failed'); return; }
@@ -455,25 +456,64 @@ async function reviewDraft(token, approve) {
   if (data.sent) LAST_RUN.sent.push(data.sent);
   LAST_RUN.reviewed = true;
   LAST_RUN.verdict = {known: false};
+  LAST_NOTICE = data.security_notice || null;
+  LAST_OVERRIDE = !!data.override;
   MAILBOX = await getMailbox();
   renderResult();
+  renderNotice();
+}
+let LAST_OVERRIDE = false;
+function renderNotice() {
+  if (!LAST_NOTICE) return;
+  const target = document.getElementById('result');
+  const section = document.createElement('section');
+  section.className = 'why';
+  section.style.borderLeft = '4px solid #e09f3e';
+  section.innerHTML = `<h3>${LAST_OVERRIDE ? 'Sent as the assistant proposed — override recorded' : 'Sent — flagged send recorded'}</h3>
+    <p>${LAST_OVERRIDE
+      ? 'You chose to send the email <b>as the assistant originally proposed</b>, putting back what the defenses had removed. Nothing stopped you — that is your call — but a second person now knows:'
+      : 'This email had been flagged or changed by the defenses before you approved it, so a second person has been told:'}</p>
+    <div class="mailrow" style="background:rgba(224,159,62,.08)">
+      <div class="who">To: ${escHtml(LAST_NOTICE.to)} <span class="tag">security notice</span></div>
+      <div class="sub">${escHtml(LAST_NOTICE.subject)}</div>
+      <pre style="white-space:pre-wrap;font:inherit;font-size:12px;margin-top:6px">${escHtml(LAST_NOTICE.body)}</pre>
+    </div>`;
+  target.appendChild(section);
+  LAST_NOTICE = null;
 }
 function renderDrafts() {
   const target = document.getElementById('result');
   for (const d of (LAST_RUN.pending || [])) {
     const section = document.createElement('section');
     section.className = 'why';
-    section.innerHTML = `<h3>Review email before sending</h3>
+    // review-v3: the person sees what the defenses did and may override.
+    const did = d.defenses_did || [];
+    const didHtml = did.length ? `<div style="border-left:3px solid #e09f3e;padding:6px 10px;margin:8px 0;background:rgba(224,159,62,.06)">
+        <b style="color:#e09f3e">What the defenses removed before showing you this draft</b>
+        <ul style="margin:6px 0 0 18px;padding:0">${did.map(x => `<li style="margin:3px 0"><span class="tag" style="font-size:10px">${escHtml(x.layer)}</span> ${escHtml(x.what)}</li>`).join('')}</ul>
+      </div>` : '';
+    const orig = d.original;
+    const origHtml = orig ? `<details style="margin:6px 0"><summary style="cursor:pointer;color:#aaa">Show the email exactly as the assistant proposed it (before the defenses)</summary>
+        <p style="font-size:12px"><b>To:</b> ${escHtml(orig.to || '')}<br><b>CC:</b> ${escHtml(orig.cc || '')}<br><b>BCC:</b> ${escHtml(orig.bcc || '')}</p>
+        <pre style="white-space:pre-wrap;font:inherit;font-size:12px">${escHtml(orig.body || '')}</pre></details>` : '';
+    section.innerHTML = `<h3>Review email before sending${d.suspicious ? ' <span class="tag tag-out">flagged</span>' : ''}</h3>
+      ${didHtml}
       <p><b>To:</b> ${escHtml(d.to || '')}<br><b>CC:</b> ${escHtml(d.cc || '')}<br>
       <b>BCC:</b> ${escHtml(d.bcc || '')}<br><b>Subject:</b> ${escHtml(d.subject || '')}</p>
       ${(d.warnings || []).map(w => `<p class="warn" style="color:#b45309;border-left:3px solid #b45309;padding-left:8px">
         <b>Look-alike domain:</b> ${escHtml(w.address)} — ${escHtml(w.reason)}. Check this is really who you mean.</p>`).join('')}
-      <pre style="white-space:pre-wrap;font:inherit">${escHtml(d.body || '')}</pre>`;
-    for (const [label, approve] of [['Approve and send', true], ['Reject draft', false]]) {
+      <pre style="white-space:pre-wrap;font:inherit">${escHtml(d.body || '')}</pre>
+      ${origHtml}
+      ${d.suspicious ? '<p style="font-size:12px;color:#aaa">Approving a flagged draft, or overriding the defenses, sends an automatic notice to the company security contact. Nothing is blocked; it is made visible.</p>' : ''}`;
+    const actions = [['Approve and send', true, false], ['Reject draft', false, false]];
+    if (orig) actions.splice(1, 0, ['Send as the assistant proposed (override defenses)', true, true]);
+    for (const [label, approve, override] of actions) {
       const button = document.createElement('button'); button.textContent = label;
+      if (override) button.style.background = '#7a4a10';
       button.addEventListener('click', async () => {
+        if (override && !confirm('This puts back what the defenses removed and notifies security. Send anyway?')) return;
         section.querySelectorAll('button').forEach(b => b.disabled = true);
-        try { await reviewDraft(d.id, approve); }
+        try { await reviewDraft(d.id, approve, override); }
         catch (error) { alert(String(error)); }
         finally { section.querySelectorAll('button').forEach(b => b.disabled = false); }
       });
@@ -633,7 +673,9 @@ function renderMore(r) {
 
   const sent = (MAILBOX.sent || []).map(e => `<div class="mailrow">
       <div class="who">To: ${escHtml(e.to)}${(e.left_company || []).length
-        ? '<span class="tag tag-out">LEFT THE COMPANY</span>' : ''}</div>
+        ? '<span class="tag tag-out">LEFT THE COMPANY</span>' : ''}${e.override
+        ? '<span class="tag tag-out">USER OVERRODE DEFENSES</span>' : ''}${e.via === 'security-notice'
+        ? '<span class="tag" style="border-color:#e09f3e;color:#e09f3e">SECURITY NOTICE</span>' : ''}</div>
       <div class="sub">${escHtml(e.subject || '(no subject)')}${e.cc ? ' · cc ' + escHtml(e.cc) : ''}${e.bcc ? ' · bcc ' + escHtml(e.bcc) : ''}</div>
     </div>`).join('') || '<div class="line-note">Nothing sent yet.</div>';
 

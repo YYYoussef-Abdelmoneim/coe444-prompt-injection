@@ -649,11 +649,15 @@ def api_mailbox_review(token):
     data = request.json or {}
     if type(data.get("approve")) is not bool:
         return jsonify({"error": "approve must be a boolean"}), 400
+    override = data.get("override") is True
     try:
-        entry = get_playground().review(token, approve=data["approve"])
+        entry = get_playground().review(token, approve=data["approve"], override=override)
     except KeyError:
         return jsonify({"error": "Draft no longer exists or was already reviewed."}), 404
-    return jsonify({"sent": entry, "approved": data["approve"]})
+    notice = None
+    if entry and entry.get("security_notice"):
+        notice = next((e for e in get_playground().sent if e["id"] == entry["security_notice"]), None)
+    return jsonify({"sent": entry, "approved": data["approve"], "override": override, "security_notice": notice})
 
 
 @app.route("/api/mailbox/reset", methods=["POST"])
