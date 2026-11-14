@@ -406,3 +406,17 @@ accepting the residual)*
   the security notice to security@ with the full account. With detection on, the panel lists the cut
   sentence from `inbox::m8` and there is no override button (nothing in the draft changed).
 - CLO10 made concrete: recovery = a second person sees the unusual send within seconds.
+
+### 31. Deck restyle — presentation-grade — *rendered and vision-checked*
+- **Trigger (user):** "make the text simple to understand… presentation principles… unified readable sizes… Times New Roman."
+- **What.** `scripts/make_deck.py` rewritten (old generator kept as `scripts/make_deck_v1.py`). Rules
+  enforced and self-checked at the end of the script: one message per slide (the blue block's
+  heading is the slide's one sentence); ≤ 3 short bullets; three type sizes only — title 32,
+  heading 20, body 18 (footer 12) — Times New Roman on every run including the template's own
+  text. Words on slide fell from ~300–380 to 75–134. Detail moved to speaker notes, unchanged in
+  substance. New projector-scale figures (`scripts/make_slide_figures.py` → `results/slide_*.png`):
+  attack-in-one-picture (slide 2), architecture with 15–19 pt labels (slide 3), ASR chart with
+  22 pt type, zero bars drawn as labelled stubs (slide 4). Figures sized by height so they end
+  above the footer.
+- Verified: LibreOffice render, each slide inspected at 110 dpi — no overlap, no clipping, no
+  footer collision. Deck + PDF in `docs/final/`.
