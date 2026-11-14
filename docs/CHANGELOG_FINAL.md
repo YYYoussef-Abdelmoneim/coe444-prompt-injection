@@ -374,3 +374,14 @@ accepting the residual)*
   explains a cut. 338 tests still pass.
 - Confirmed: `/api/payloads` exposes dev only — no test-split id reaches the UI; advanced
   payloads are not in the dropdown (inbox demo uses the seeded example attack email instead).
+
+### 29. Real rendering of the deliverables (LibreOffice) — *verified*
+- Disk was 96 % full (514 MB free) — found because the LibreOffice download failed; cleared ~8 GB
+  of app caches with the user's approval (10 GB free). A full disk would have risked the demo.
+- Installed LibreOffice + poppler; rendered both deliverables to PDF and PNG and inspected every
+  slide and page. **Deck: all 5 slides clean, no overflow.** **Report: 9 pages (cap 10)**, no
+  clipped figure, no orphan heading, no split table. Enlarged Figure 1 labels, moved §3.2 body
+  before Figure 3, shortened Table 1 labels. PDFs committed beside the sources
+  (`docs/final/COE444_Final_Report.pdf`, `COE444_Final_Presentation.pdf`).
+- GitHub: pushed `5cbfc51 → 5fb9907` after the user authenticated as the repo owner; origin/main
+  now equals local.
