@@ -431,8 +431,11 @@ function renderUsage(u) {
 function whyItFailed(r) {
   const gated = (r.gate || []).filter(g => g.decision === 'sanitize' || g.decision === 'deny');
   const withheld = (r.read || []).filter(c => c.withheld);
+  const cut = (r.read || []).filter(c => c.redacted);
   if (gated.some(g => g.decision === 'deny')) return 'The prevention gate refused to send the email.';
   if (gated.length) return 'The prevention gate removed the planted recipient from the proposed email before review.';
+  if (cut.length) return 'Detection cut the injected sentence out of ' + cut.length + ' excerpt'
+    + (cut.length > 1 ? 's' : '') + ' before the assistant read ' + (cut.length > 1 ? 'them' : 'it') + '; the rest of the text was kept and the task went on.';
   if (withheld.length) return 'Detection withheld ' + withheld.length + ' flagged excerpt'
     + (withheld.length > 1 ? 's' : '') + ' before the assistant could read ' + (withheld.length > 1 ? 'them.' : 'it.');
   const d = r.defenses || {};
@@ -634,12 +637,25 @@ function renderMore(r) {
       <div class="sub">${escHtml(e.subject || '(no subject)')}${e.cc ? ' · cc ' + escHtml(e.cc) : ''}${e.bcc ? ' · bcc ' + escHtml(e.bcc) : ''}</div>
     </div>`).join('') || '<div class="line-note">Nothing sent yet.</div>';
 
-  const read = (r.read || []).map(c => `<div class="mailrow">
+  // review-v2 (9 Nov): show what the detector scored and what it did to each
+  // excerpt. Before this the page showed WITHHELD only, so a cut span looked
+  // like "detection did nothing" even when it had removed the attack.
+  const read = (r.read || []).map(c => {
+    const det = c.detection;
+    const score = det && typeof det.score === 'number' ? det.score.toFixed(2) : null;
+    const flagged = det && det.flagged;
+    const badge = score === null ? '<span class="tag" style="opacity:.6">detector off</span>'
+      : `<span class="tag ${flagged ? 'tag-out' : ''}" style="${flagged ? '' : 'opacity:.75'}">detector ${score}${flagged ? ' · FLAGGED' : ' · clean'}</span>`;
+    const action = c.withheld ? '<span class="tag tag-out">WITHHELD BY DETECTION</span>'
+      : c.redacted ? '<span class="tag tag-out">SPAN CUT BY DETECTION</span>' : '';
+    const span = (c.redacted && det && det.span) ? `<div class="sub" style="color:#ff8a80;font-family:var(--font-mono);font-size:11px">removed: "${escHtml(String(det.span).slice(0, 200))}"</div>` : '';
+    return `<div class="mailrow">
       <div class="who" style="font-family:var(--font-mono);font-size:11.5px">${escHtml(c.chunk_id)}${c.planted
-        ? '<span class="tag tag-out">PLANTED</span>' : ''}${c.withheld
-        ? '<span class="tag tag-out">WITHHELD BY DETECTION</span>' : ''}</div>
-      <div class="sub" style="font-family:var(--font-mono);font-size:11px">${escHtml(String(c.text || '').slice(0, 220))}…</div>
-    </div>`).join('');
+        ? '<span class="tag tag-out">PLANTED</span>' : ''} ${badge} ${action}</div>
+      ${span}
+      <div class="sub" style="font-family:var(--font-mono);font-size:11px">${escHtml(String((c.redacted && c.shown_text) ? c.shown_text : (c.text || '')).slice(0, 220))}…</div>
+    </div>`;
+  }).join('');
 
   return `
     <details class="more"><summary>The mailbox (inbox and sent)</summary>
