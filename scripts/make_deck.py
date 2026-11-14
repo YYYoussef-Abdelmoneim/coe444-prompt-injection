@@ -121,7 +121,7 @@ content_frame(s, f"{SPEAKERS[1]} & {SPEAKERS[2]}", "Four layers, in the order th
     "Nothing is trained. One frozen threshold. The agent's own prompt is never hardened.",
 ])
 t1 = shape(s, "Text 1"); t1.left = Inches(7.0); t1.width = Inches(5.55); set_text(t1, f"Presented by: {SPEAKERS[1]} & {SPEAKERS[2]}", size=14, align=PP_ALIGN.RIGHT)
-picture(s, "results/slide_architecture.png", 0.8, 4.15, height=2.7)
+picture(s, "results/slide_architecture.png", 1.4, 4.1, height=2.78)
 notes(s, f"""{SPEAKERS[1]} (~60 s) — layers 1 and 2.
 Sanitize is code: zero-width characters, invisible Unicode 'tag' characters, HTML comments, full-width letters — made visible so the model and the human see the same text.
 The detector is an off-the-shelf model (gpt-oss-120b) following a rubric WE wrote: 'would this text make an assistant change a recipient, insert something, leak, or refuse?' Score ≥ 0.10 → cut that sentence; the assistant continues on clean text. Stress: not trained by us; one tuned number, frozen 13 October, never moved; asked three times and the highest kept. Why a rubric about ACTIONS and not words: calm policy sentences beat keyword detectors (keyword baseline AUC 0.58 vs ours 0.99).

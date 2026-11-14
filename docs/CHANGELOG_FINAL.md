@@ -479,3 +479,6 @@ accepting the residual)*
   size (k/18) with a footnote stating that a never-retrieved payload counts as not attempted.
   The plotted rates and CIs are unchanged (still computed over attempted payloads, as in the
   report). Architecture figure widened to ~64 % of slide width.
+
+### 35. Slide 3 diagram reverted to the report structure
+- **Trigger (user):** the simplified slide diagram was harder to understand than Figure 1. Restored the Figure 1 layout (four sources → origin stamps → Sanitize/Detector → Agent → Provenance gate → Human review → Sent; dashed origin-tag line into the GATE, not the output) with projector-size type; the simplified version had also drawn the tag line into "Sent", which was wrong. Spans ~95 % of slide width, verified.

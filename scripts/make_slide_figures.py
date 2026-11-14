@@ -50,30 +50,46 @@ for s in ("top", "right"): ax.spines[s].set_visible(False)
 fig.text(0.99, 0.01, "Brackets: 95 % CI. A payload the agent never retrieved counts as not attempted, not as a success.", ha="right", fontsize=15, color="#555")
 fig.tight_layout(); fig.savefig("results/slide_asr.png", dpi=200); plt.close(fig)
 
-# ── Slide 3 figure: architecture, big type ──
-fig, ax = plt.subplots(figsize=(15, 5.0)); ax.set_xlim(0, 12.5); ax.set_ylim(0, 5.4); ax.axis("off")
-def box(x, y, w, h, text, fc, ec, fs=17, bold=False, tc=INK):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.1", fc=fc, ec=ec, lw=1.6))
+# ── Slide 3 figure: architecture — same structure as the report's Figure 1 (make_architecture.py),
+#    bigger type for a projector. Origin stamps at entry; tags travel to the GATE, not to the output.
+fig, ax = plt.subplots(figsize=(14, 6.2)); ax.set_xlim(0, 11.2); ax.set_ylim(0, 5.3); ax.axis("off")
+def box(x, y, w, h, text, fc, ec, fs=15, bold=False, tc=INK):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.08", fc=fc, ec=ec, lw=1.6))
     ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs, color=tc, fontweight="bold" if bold else "normal", linespacing=1.15)
 def arrow(x1, y1, x2, y2, color=INK, ls="-"):
-    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=18, color=color, lw=1.8, ls=ls))
-box(0.2, 3.6, 2.3, 1.1, "Attacker's email\nor edited document", "#fde2e1", RED)
-box(0.2, 1.0, 2.3, 1.1, "Layla's request\n+ company directory", "#e3f2fd", SLATE)
-box(3.1, 3.6, 2.0, 1.1, "1  Sanitize\nhidden text → visible", "#e8f5e9", GREEN, fs=16)
-box(5.6, 3.6, 2.0, 1.1, "2  Detector\ncuts the instruction", "#e8f5e9", GREEN, fs=16)
-box(8.1, 2.2, 1.8, 1.4, "Agent\n(gpt-oss-20b)", "#f3f4f6", "#555", fs=17, bold=True)
-box(10.4, 3.4, 1.9, 1.1, "3  Gate\nrecipients & links\nmust trace to you", "#e8f5e9", GREEN, fs=15)
-box(10.4, 1.9, 1.9, 1.1, "4  Human review\n+ security notice", "#e8f5e9", GREEN, fs=15)
-box(10.4, 0.5, 1.9, 0.8, "Sent", "#f3f4f6", "#555", fs=16)
-arrow(2.5, 4.15, 3.1, 4.15); arrow(5.1, 4.15, 5.6, 4.15); arrow(7.6, 4.15, 8.1, 3.4)
-arrow(2.5, 1.55, 8.1, 2.6, color=SLATE)
-arrow(9.9, 2.9, 10.4, 3.6); arrow(11.35, 3.4, 11.35, 3.0); arrow(11.35, 1.9, 11.35, 1.3)
-ax.plot([1.35, 1.35, 11.35], [1.0, 0.25, 0.25], color=AMBER, ls="--", lw=1.8); arrow(11.35, 0.25, 11.35, 0.5, color=AMBER)
-ax.text(6.3, 0.45, "origin tags: where did these bytes come from?", fontsize=15, color="#b07a1e", ha="center")
-ax.text(5.6, 5.1, "What the agent reads", fontsize=19, ha="center", color=GREEN, fontweight="bold")
-ax.text(11.35, 4.85, "What it sends", fontsize=19, ha="center", color=GREEN, fontweight="bold")
-ax.text(1.35, 3.15, "untrusted", fontsize=14, ha="center", color=RED, style="italic")
-ax.text(1.35, 0.6, "trusted", fontsize=14, ha="center", color=SLATE, style="italic")
+    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=16, color=color, lw=1.8, ls=ls))
+# sources (left)
+box(0.2, 3.9, 1.9, 0.8, "Attacker's email\n→ Layla's inbox", "#fde2e1", RED, tc=RED)
+box(0.2, 2.9, 1.9, 0.8, "Edited document\n(wiki, PDF)", "#fde2e1", RED, tc=RED)
+box(0.2, 1.3, 1.9, 0.8, "Layla's typed\nrequest", "#e3f2fd", SLATE, tc=SLATE)
+box(0.2, 0.3, 1.9, 0.8, "Company directory", "#e3f2fd", SLATE, tc=SLATE)
+# origin stamps
+box(2.55, 2.75, 1.45, 2.05, "Origin stamp\nat entry\n\nEXTERNAL", "#fff4e0", AMBER, fs=14, bold=True)
+box(2.55, 0.3, 1.45, 1.8, "Origin stamp\n\nUSER /\nDIRECTORY", "#fff4e0", AMBER, fs=14, bold=True)
+arrow(2.1, 4.3, 2.55, 4.05); arrow(2.1, 3.3, 2.55, 3.45)
+arrow(2.1, 1.7, 2.55, 1.45); arrow(2.1, 0.7, 2.55, 0.95)
+# layers 1-2 on external text
+box(4.4, 3.85, 1.7, 0.85, "1  Sanitize\nhidden text → visible", "#e8f5e9", GREEN, fs=14)
+box(4.4, 2.75, 1.7, 0.85, "2  Detector\ncuts the instruction", "#e8f5e9", GREEN, fs=14)
+arrow(4.0, 4.27, 4.4, 4.27); arrow(5.25, 3.85, 5.25, 3.6)
+# agent
+box(6.6, 1.6, 1.8, 2.3, "Agent\n(gpt-oss-20b)\n\nprompt never\nhardened", "#f5f5f5", "#555", fs=14, bold=True)
+arrow(6.1, 3.17, 6.6, 3.0)
+arrow(4.0, 1.5, 6.6, 2.1, color=SLATE)
+ax.text(5.15, 2.0, "user + directory text,\nread untouched", fontsize=12, color=SLATE, ha="center", style="italic")
+# layers 3-4 on the send
+box(8.85, 2.45, 2.1, 1.15, "3  Provenance gate\nevery address & link must\ntrace to USER or DIRECTORY", "#e8f5e9", GREEN, fs=13)
+box(8.85, 1.0, 2.1, 0.95, "4  Human review\nsees what was removed\n+ security notice", "#e8f5e9", GREEN, fs=13)
+arrow(8.4, 3.0, 8.85, 3.0); arrow(9.9, 2.45, 9.9, 1.95)
+box(8.85, 0.3, 2.1, 0.5, "Sent", "#eeeeee", "#777", fs=14)
+arrow(9.9, 1.0, 9.9, 0.8)
+# origin tags travel along the bottom to the GATE, bypassing the agent
+ax.plot([3.3, 3.3, 11.1, 11.1], [0.3, 0.08, 0.08, 3.0], color=AMBER, ls="--", lw=1.8)
+ax.add_patch(FancyArrowPatch((11.1, 3.0), (10.95, 3.0), arrowstyle="-|>", mutation_scale=16, color=AMBER, lw=1.8))
+ax.text(6.2, 0.16, "origin tags → gate: it asks where the bytes came from, never what they say", fontsize=13, color="#b07a1e", ha="center")
+ax.text(5.25, 5.0, "What the agent READS", fontsize=17, ha="center", color=GREEN, fontweight="bold")
+ax.text(9.9, 3.95, "What the agent SENDS", fontsize=17, ha="center", color=GREEN, fontweight="bold")
+ax.text(0.2, 5.0, "Attacker: no account, no chat access — only text", fontsize=13, color=RED, style="italic")
 fig.tight_layout(); fig.savefig("results/slide_architecture.png", dpi=200, bbox_inches="tight"); plt.close(fig)
 
 # ── Slide 2 figure: the attack in one picture ──
