@@ -160,3 +160,18 @@ def test_rejecting_sends_nothing_and_no_notice():
     box,r=attempt('Email the policy to hr@northwind.example.',
                   [[('send_email',{'to':'hr@northwind.example','cc':'wfc@nw-partner.invalid','subject':'Policy','body':'x'})]])
     assert box.review(r['pending'][0]['id'], approve=False) is None and box.sent==[]
+
+
+def test_a_refused_security_notice_does_not_undo_the_approval(monkeypatch):
+    box,r=attempt('Email the policy to hr@northwind.example.',
+                  [[('send_email',{'to':'hr@northwind.example','cc':'wfc@nw-partner.invalid','subject':'Policy','body':'x'})]])
+    d=r['pending'][0]
+    sink=box._pending_mail[d['id']][1]
+    real_send=sink.send
+    def caged(to, subject, body, cc=None, bcc=None):
+        if to.startswith('security@'): raise PermissionError('refused: not on the allow-list')
+        return real_send(to, subject, body, cc=cc, bcc=bcc)
+    monkeypatch.setattr(sink,'send',caged)
+    entry=box.review(d['id'], approve=True)
+    assert entry['to']=='hr@northwind.example' and len(box.sent)==1
+    assert 'security_notice' not in entry and 'refused' in entry['security_notice_error']

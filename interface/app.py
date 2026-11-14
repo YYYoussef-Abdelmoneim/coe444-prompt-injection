@@ -135,7 +135,10 @@ def load_all():
             retriever = _cache.get("retriever")
             if retriever is None:
                 raise RuntimeError("retriever failed to load; agent needs it")
-            mail = get_mail_backend()
+            # Always the simulated sink here: the Mailbox swaps in its own
+            # per-run backend (interface/playground.py), which is the only
+            # place the demo-only Gmail backend can appear.
+            mail = get_mail_backend("simulated")
             _cache["mail"] = mail
             _cache["agent"] = Agent(get_provider(AGENT_PROVIDER, AGENT_MODEL), retriever, mail)
         except Exception as e:

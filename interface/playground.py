@@ -22,6 +22,7 @@ Containment is unchanged: sending lands in a MailSink, never on a network.
 from __future__ import annotations
 
 import copy
+import os
 import secrets
 import threading
 import itertools
@@ -278,7 +279,12 @@ class Playground:
                 "suspicious": bool(did or warnings or gate.get("decision") in ("confirm", "sanitize"))}
 
     def security_contact(self) -> str:
-        """Where override notices go: the directory's security role, else the manager."""
+        """Where override notices go: the directory's security role, else the manager.
+        In the Gmail demo the fictional company has no mailbox, so the notice is
+        delivered to the demo account itself (GMAIL_SECURITY_CONTACT, default the
+        signed-in address) - it then appears in the real inbox on screen."""
+        if self.real_mail:
+            return os.getenv("GMAIL_SECURITY_CONTACT") or getattr(self.backend(), "address", None) or "me"
         for role in ("security", "manager"):
             hit = [e for e in self.directory.entries if e.role == role]
             if hit:
@@ -312,7 +318,14 @@ class Playground:
         suspicious = bool(did or gate.get("decision") in ("confirm", "sanitize") or entry["left_company"])
         if override or suspicious:
             notice = self._security_notice(final, did, override, entry)
-            sink.send(to=notice["to"], subject=notice["subject"], body=notice["body"])
+            try:
+                sink.send(to=notice["to"], subject=notice["subject"], body=notice["body"])
+            except PermissionError as exc:
+                # The user's email already went; a notice the backend refuses
+                # must not turn a completed approval into a 500. Record it.
+                entry["security_notice_error"] = str(exc)
+                _log.error("security notice not delivered: %s", exc)
+                return entry
             nentry = self._sent_entry(notice, via="security-notice", gate=None)
             nentry["notice_for"] = entry["id"]
             self.sent.insert(0, nentry)

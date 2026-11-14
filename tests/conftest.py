@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 import pytest
+
+# The suite never touches real mail, whatever the developer's .env says
+# (the Gmail demo backend is opt-in for the Mailbox UI only).
+os.environ["MAIL_BACKEND"] = "simulated"
 
 from schema import Origin, TaggedChunk
 

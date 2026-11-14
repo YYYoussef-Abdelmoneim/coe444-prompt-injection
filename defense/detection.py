@@ -202,9 +202,32 @@ def redact(chunk: TaggedChunk, result: DetectionResult, *, threshold: float) -> 
     """
     if not (result.failed or result.score >= threshold):
         return chunk
-    if result.failed or not result.span or result.span not in chunk.text:
+    if result.failed or not result.span:
         return None
-    return replace(chunk, text=chunk.text.replace(result.span, "[removed by detection]"))
+    cut = _cut_span(chunk.text, result.span)
+    if cut is None:
+        return None
+    return replace(chunk, text=cut)
+
+
+def _cut_span(text: str, span: str) -> str | None:
+    """Remove `span` from `text`, tolerating only whitespace differences.
+
+    Real mail is hard-wrapped (RFC 5322: ~72 columns, CRLF), so a sentence the
+    detector quotes on one line appears in the message across two or three
+    lines. The words must still match exactly and in order - the span is matched
+    as a regex in which every whitespace run becomes `\\s+` - so this is not a
+    fuzzy match: a span whose words are not in the text still withholds
+    everything (fail closed). Found while running against a real Gmail inbox."""
+    if span in text:
+        return text.replace(span, "[removed by detection]")
+    words = span.split()
+    if not words:
+        return None
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in words))
+    if not pattern.search(text):
+        return None
+    return pattern.sub("[removed by detection]", text)
 
 
 def _user_message(text: str) -> str:

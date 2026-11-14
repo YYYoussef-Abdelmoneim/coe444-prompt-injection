@@ -41,7 +41,14 @@ def test_the_evaluation_harness_never_imports_the_gmail_backend():
 
 
 def test_the_default_backend_is_still_the_simulated_sink(monkeypatch):
+    """With no MAIL_BACKEND anywhere (env or .env), config falls back to the sink."""
     monkeypatch.delenv("MAIL_BACKEND", raising=False)
-    import importlib, config, mailsink
-    importlib.reload(config); importlib.reload(mailsink)
-    assert type(mailsink.get_mail_backend()).__name__ == "MailSink"
+    import importlib, dotenv, config, mailsink
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)   # ignore the developer's .env
+    importlib.reload(config)
+    try:
+        assert config.MAIL_BACKEND == "simulated"
+        importlib.reload(mailsink)
+        assert type(mailsink.get_mail_backend()).__name__ == "MailSink"
+    finally:
+        monkeypatch.undo(); importlib.reload(config); importlib.reload(mailsink)
