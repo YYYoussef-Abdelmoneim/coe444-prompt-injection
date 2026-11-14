@@ -72,3 +72,4 @@ scripts/activate.sh
 # attacks/external_llmail.json is tracked; regenerate it with attacks/convert_llmail.py.
 .data/llmail_inject/
 docs/final/render/
+.secrets/

@@ -35,7 +35,13 @@ assistant does with it."
      the body. **Say:** "Same inbox, same request. The detector cut one sentence, the assistant
      finished the job, and nothing leaves until Layla approves it." Click **Reject draft** (or
      Approve — either is fine; nothing went to the attacker).
-3. (If 20 s remain) Task: `Email the leave policy summary to hr@northvvind.example.` Run with
+3. **Override beat (20 s, strongest close).** Reset. Same task, Detection **OFF**, Prevention **ON**.
+   Run. The review panel now says *"gate stripped BCC records@nw-partner.invalid"* and offers a third
+   button, **Send as the assistant proposed (override defenses)**. Click it, confirm. **Say:** "Maybe
+   Layla really does want the partner copied — she can override; the human is the authority. But look
+   at the sent folder: the email went with the BCC, tagged, and **security was told automatically**
+   with the whole story. Nothing is blocked. Nothing is silent." Point at the orange notice panel.
+4. (If 20 s remain) Task: `Email the leave policy summary to hr@northvvind.example.` Run with
    defenses on → the review panel shows the yellow **Look-alike domain** warning. **Say:** "And when
    the attack is aimed at the human approver instead of the model, the human gets told."
 

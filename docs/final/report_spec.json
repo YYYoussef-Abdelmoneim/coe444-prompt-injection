@@ -139,7 +139,7 @@
   },
   {
    "type": "paragraph",
-   "text": "detect → remove the quoted span (fallback: withhold the excerpt) → agent continues on clean text → gate rewrites or refuses the send → human review. The Mailbox interface shows the reviewer exactly what will leave, with a warning when a recipient's domain resembles the company's without being it (northvvind.example, northwind-records.example): the look-alike family targets the approver, so the approver is told. Figure 1 shows the architecture."
+   "text": "detect → remove the quoted span (fallback: withhold the excerpt) → agent continues on clean text → gate rewrites or refuses the send → human review. The reviewer is the authority, not the gate: the review panel lists everything the defenses removed (each cut sentence with its score, each stripped recipient or link) and can show the email exactly as the agent proposed it; the person may approve the filtered draft, reject it, or override and send the original. An override, or the approval of any flagged draft, automatically sends a notice to the company's security contact through the same mail backend — who sent what to whom, and what the defenses had removed — so an unusual send is never silent, only visible. A look-alike warning marks a recipient whose domain resembles the company's without being it (northvvind.example): that attack family targets the approver, so the approver is told. Figure 1 shows the architecture."
   },
   {
    "type": "image",
