@@ -37,7 +37,12 @@ from conditions import DEFAULT_DETECTION_THRESHOLD, is_flagged
 from defense.detection import redact
 from config import DOCUMENTS_DIR
 from directory import Directory
-from mailsink import MailBackend, get_mail_backend
+from mailsink import MailBackend, get_mail_backend, register_backend
+from config import MAIL_BACKEND
+
+if MAIL_BACKEND == "gmail":            # demo only; the evaluation never reaches this module
+    from gmail_backend import GmailBackend
+    register_backend("gmail", GmailBackend)
 from rag.chunker import canonical_document_id
 from schema import DetectionResult, Origin, TaggedChunk, ToolCall
 
@@ -162,8 +167,36 @@ class Playground:
         self.inbox: list[dict[str, Any]] = []
         self.sent: list[dict[str, Any]] = []
         self.poisons: dict[str, str] = {}
-        for e in _SEED_INBOX:
-            self.receive(e["sender"], e["subject"], e["body"], example_attack=e.get("example_attack", False))
+        if self.real_mail:
+            self.refresh_inbox()
+        else:
+            for e in _SEED_INBOX:
+                self.receive(e["sender"], e["subject"], e["body"], example_attack=e.get("example_attack", False))
+
+    @property
+    def real_mail(self) -> bool:
+        return MAIL_BACKEND == "gmail"
+
+    _shared_backend: MailBackend | None = None
+
+    def backend(self) -> MailBackend:
+        """Simulated: a fresh sink per run. Gmail: one signed-in backend for the whole app."""
+        if not self.real_mail:
+            return get_mail_backend()
+        if Playground._shared_backend is None:
+            Playground._shared_backend = get_mail_backend("gmail")
+        return Playground._shared_backend
+
+    def refresh_inbox(self, limit: int = 10) -> int:
+        """Gmail only: replace the Mailbox inbox with the real INBOX (newest first)."""
+        if not self.real_mail:
+            return len(self.inbox)
+        fetched = self.backend().fetch_inbox(limit)   # type: ignore[attr-defined]
+        self.inbox = []
+        for e in reversed(fetched):
+            email = self.receive(e["sender"], e["subject"], e["body"])
+            email["gmail_id"] = e["gmail_id"]; email["date"] = e["date"] or email["date"]
+        return len(self.inbox)
 
     def receive(self, sender: str, subject: str, body: str, *, example_attack: bool = False) -> dict[str, Any]:
         email = {
@@ -403,7 +436,7 @@ class _LiveRun:
         self.pending_reviews: list[dict[str, Any]] = []
         self.seen: list[TaggedChunk] = []
         self.planted: dict[str, str] = {}
-        self.sink = get_mail_backend()
+        self.sink = box.backend()
         self.mail = _LiveMail(self)
         self._pending: list[dict[str, Any]] = []
 

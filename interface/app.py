@@ -600,6 +600,8 @@ def api_mailbox():
     return jsonify(
         {
             "employee": EMPLOYEE,
+            "real_mail": box.real_mail,
+            "real_address": getattr(box.backend(), "address", None) if box.real_mail else None,
             "inbox": box.inbox,
             "sent": box.sent,
             "documents": [{k: d[k] for k in ("id", "title", "planted")} for d in box.documents()],
@@ -658,6 +660,19 @@ def api_mailbox_review(token):
     if entry and entry.get("security_notice"):
         notice = next((e for e in get_playground().sent if e["id"] == entry["security_notice"]), None)
     return jsonify({"sent": entry, "approved": data["approve"], "override": override, "security_notice": notice})
+
+
+@app.route("/api/mailbox/refresh", methods=["POST"])
+def mailbox_refresh():
+    """Gmail demo only: pull the real inbox again (after the attacker's email arrives)."""
+    box = get_playground()
+    if not box.real_mail:
+        return jsonify({"real_mail": False, "count": len(box.inbox)})
+    try:
+        n = box.refresh_inbox()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
+    return jsonify({"real_mail": True, "count": n, "address": getattr(box.backend(), "address", None)})
 
 
 @app.route("/api/mailbox/reset", methods=["POST"])

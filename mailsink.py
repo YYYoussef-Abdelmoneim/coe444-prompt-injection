@@ -76,6 +76,12 @@ class MailSink(MailBackend):
 _BACKENDS: dict[str, type[MailBackend]] = {"simulated": MailSink}
 
 
+def register_backend(kind: str, cls: type[MailBackend]) -> None:
+    """Demo-only backends register themselves from the interface layer, so this
+    module - which the evaluation imports - never imports them."""
+    _BACKENDS[kind] = cls
+
+
 def get_mail_backend(kind: str = MAIL_BACKEND) -> MailBackend:
     try:
         return _BACKENDS[kind]()

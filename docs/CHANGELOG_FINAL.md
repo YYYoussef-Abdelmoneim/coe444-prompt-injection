@@ -420,3 +420,19 @@ accepting the residual)*
   above the footer.
 - Verified: LibreOffice render, each slide inspected at 110 dpi — no overlap, no clipping, no
   footer collision. Deck + PDF in `docs/final/`.
+
+### 32. Gmail demo backend (demo only) — *implemented, caged, not yet signed in*
+- **Trigger (user):** throwaway account `444testmail@gmail.com` created, Gmail API enabled in
+  GCP project `coe444-demo`, OAuth desktop client created.
+- **What.** `gmail_backend.py`: `GmailBackend(MailBackend)` — OAuth (`gmail.send` +
+  `gmail.readonly`), token in `.secrets/token.json` (0600, git-ignored), `send()` via the Gmail
+  API, `fetch_inbox()` for the agent's `read_inbox`. **Cage:** `check_allowed()` runs before any
+  network call — every To/CC/BCC must be on `GMAIL_ALLOWED_RECIPIENTS` or the WHOLE send is
+  refused (not silently trimmed), in every condition including defenses-off. Empty list → refuses
+  everything. Registered from `interface/playground.py` via `mailsink.register_backend()` only
+  when `MAIL_BACKEND=gmail`; `mailsink.py`, `cli.py`, `evaluation/*`, `agent/agent.py` never
+  import it (tested). Mailbox: one signed-in backend shared across runs, inbox replaced by the real
+  INBOX on reset, "Fetch real inbox" button + orange banner, `/api/mailbox/refresh`.
+- 7 tests in `tests/test_gmail_cage.py`. Default backend remains `MailSink` (tested).
+- Not done: first OAuth sign-in (needs the downloaded client file at `.secrets/credentials.json`);
+  end-to-end send between the two allow-listed addresses.
