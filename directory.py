@@ -63,6 +63,20 @@ class Directory:
         )
         return cls(raw["directory_version"], frozenset(d.lower() for d in raw["internal_domains"]), entries)
 
+    def remapped(self, mapping: dict[str, str], *, self_address: str | None = None) -> "Directory":
+        """Demo helper: the same people with real mailboxes. `mapping` keys are
+        the fictional local part or the role; unmapped entries keep their address
+        (and so cannot be mailed by the caged Gmail backend). `internal_domains`
+        becomes the set of domains of the mapped addresses plus the original, so
+        "inside the company" means "a mailbox someone in the directory owns"."""
+        entries = []
+        for e in self.entries:
+            local = e.email.split("@", 1)[0]
+            new = mapping.get(local) or mapping.get(e.role) or e.email
+            entries.append(Entry(name=e.name, role=e.role, email=new, domain=new.rsplit("@", 1)[1],
+                                 clearance=e.clearance, aliases=e.aliases))
+        return Directory(self.version + "+gmail", self.internal_domains, tuple(entries))
+
     def addresses(self) -> frozenset[str]:
         return frozenset(e.email for e in self.entries)
 

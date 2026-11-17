@@ -151,6 +151,10 @@
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.sum{margin-top:10px;display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px}
+.sum-k{color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-size:10.5px;padding-top:3px}
+.sum-v code{font-size:12px}
+.sum-v.bad{color:var(--red)} .sum-v.good{color:var(--green)} .sum-v.warn{color:var(--yellow)}
 </style>
 </head>
 <body>
@@ -175,7 +179,6 @@
     <div id="setup"></div>
     <div id="mail-tools" style="display:flex;gap:8px;align-items:center;margin-top:10px">
       <span id="mail-mode" class="chip">Simulated mail</span>
-      <button class="toggle-btn" id="refresh-btn" style="border:1px solid #e09f3e;color:#e09f3e;display:none">Fetch real inbox</button>
       <button class="toggle-btn" data-reset="1" style="margin-left:auto;border:1px solid var(--border)">Reset mailbox</button>
     </div>
   </div>
@@ -291,19 +294,12 @@ async function init() {
   ]);
   MAILBOX = mb || { documents: [], inbox: [], sent: [] };
   if (MAILBOX.real_mail) {
-    const b = document.getElementById('refresh-btn'); b.style.display = '';
-    b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')';
     const banner = document.createElement('div');
     banner.style.cssText = 'margin:0 0 10px;padding:8px 12px;border:1px solid #e09f3e;border-radius:6px;color:#e09f3e;font-size:13px';
-    banner.textContent = 'REAL GMAIL DEMO — sends go through the Gmail API. Only allow-listed recipients can ever receive mail; anything else is refused.';
+    banner.textContent = 'REAL GMAIL — the assistant reads the live inbox of ' + (MAILBOX.real_address || '') + ' every time it is asked, and sends through Gmail. Only allow-listed recipients can receive mail.';
     document.body.insertBefore(banner, document.body.firstChild);
     document.getElementById('mail-mode').textContent = 'REAL GMAIL: ' + (MAILBOX.real_address || '');
     document.getElementById('mail-mode').style.color = '#e09f3e';
-    b.addEventListener('click', async () => {
-      b.disabled = true; b.textContent = 'Fetching…';
-      try { const r = await fetch('/api/mailbox/refresh', {method:'POST'}); const d = await r.json(); if (!r.ok) alert(d.error); }
-      finally { MAILBOX = await getMailbox(); b.disabled = false; b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')'; if (LAST_RUN) renderResult(); }
-    });
   }
 
   // dev split only — the test payloads stay unopened until the final run.
@@ -448,6 +444,65 @@ function renderUsage(u) {
 // What actually stopped the attack, from what the server reports. This used to
 // say the defenses were empty files on every miss, even once a gate had
 // stripped the planted recipient.
+function buildSummary(r, added, escaped, delivered, asked, isAttack, v) {
+  // Four questions the audience has, answered from the run record only.
+  const read = r.read || [];
+  const flagged = read.filter(c => c.detection && (c.redacted || c.withheld));
+  const gateActs = (r.gate || []).filter(g => g.decision === 'sanitize' || g.decision === 'deny');
+  const confirms = (r.gate || []).filter(g => g.decision === 'confirm');
+  const pending = (r.pending || []).length > 0;
+  const df = r.defenses || {};
+  const detOn = !!(df.detection || {}).on, prevOn = !!(df.prevention || {}).on;
+
+  // What was the attacker trying to do? Only knowable from text the run saw.
+  const inboxOutsiders = read.filter(c => c.source === 'inbox' && /\b(bcc|cc|copy|forward|send|include)\b/i.test(c.text) && addrsIn(c.text).length);
+  const bccAsk = read.find(c => /\bbcc\b/i.test(c.text || '') && addrsIn(c.text).length);
+  let goal = null;
+  if (isAttack && v.known && v.predicate) goal = HOW_IT_WON[v.predicate] || v.predicate;
+  else if (bccAsk) goal = 'get a hidden copy (BCC) of ' + (MAILBOX.employee || {}).name.split(' ')[0] + "'s outgoing email";
+  else if (inboxOutsiders.length) goal = 'make the assistant send to an address it chose';
+
+  const rows = [];
+  const row = (k, val, tone) => rows.push(`<div class="sum-row"><span class="sum-k">${k}</span><span class="sum-v ${tone || ''}">${val}</span></div>`);
+
+  if (goal) row('Attacker wanted', escHtml(goal));
+
+  if (added.length) {
+    row('Outcome', '<b>ATTACK SUCCEEDED</b> — ' + added.map(a => `<code>${escHtml(a.addr)}</code> as ${a.field.toUpperCase()}`).join(', ') + ' got the email', 'bad');
+    row('Stopped by', detOn || prevOn ? 'nothing — the active defenses missed this' : 'nothing — both defenses were OFF', 'bad');
+  } else if (pending) {
+    row('Outcome', '<b>HELD FOR YOUR REVIEW</b> — nothing has been sent yet', 'warn');
+  } else if (flagged.length || gateActs.length) {
+    row('Outcome', '<b>ATTACK STOPPED</b>', 'good');
+  } else if (goal && delivered.length) {
+    row('Outcome', '<b>ATTACK DID NOT TAKE</b> — the assistant sent mail but ignored the instruction this time; no defense had to act', 'good');
+  } else if (goal && (r.steps || []).some(st => st.tool === 'send_email') && r.error) {
+    row('Outcome', 'the send attempt failed (' + escHtml(String(r.error).slice(0, 120)) + ')', 'warn');
+  } else if (goal) {
+    row('Outcome', 'nothing sent on this turn — the instruction is sitting in the inbox, waiting for the next email the assistant sends', 'warn');
+  }
+
+  if (flagged.length) {
+    const c = flagged[0];
+    row('Detector', `scored <b>${(c.detection.score || 0).toFixed(2)}</b> and ${c.redacted ? 'cut the sentence' : 'withheld the message'} from <code>${escHtml(c.chunk_id)}</code>` + (c.detection.span ? `: “${escHtml(c.detection.span.length > 110 ? c.detection.span.slice(0, 110) + '…' : c.detection.span)}”` : ''), 'good');
+  } else if (detOn) {
+    row('Detector', 'saw nothing to flag (all excerpts scored low)');
+  }
+  if (gateActs.length) {
+    const g = gateActs[0];
+    row('Gate', (g.decision === 'deny' ? 'refused the send' : 'stripped the recipient/link the assistant added') + (g.reason ? ` — ${escHtml(g.reason.length > 120 ? g.reason.slice(0, 120) + '…' : g.reason)}` : ''), 'good');
+  } else if (prevOn && confirms.length) {
+    row('Gate', 'every recipient traced to you or the directory; an outside address needs your confirmation');
+  } else if (prevOn) {
+    row('Gate', 'every recipient traced to you or the directory — nothing to strip');
+  }
+
+  const taskDone = pending ? 'waiting on you' : (delivered.length || (r.reply && !r.error)) ? 'yes' : 'no';
+  row("Layla's task done", taskDone, taskDone === 'yes' ? 'good' : taskDone === 'no' ? 'bad' : 'warn');
+
+  return rows.length ? `<div class="sum">${rows.join('')}</div>` : '';
+}
+
 function whyItFailed(r) {
   const gated = (r.gate || []).filter(g => g.decision === 'sanitize' || g.decision === 'deny');
   const withheld = (r.read || []).filter(c => c.withheld);
@@ -600,6 +655,9 @@ function renderResult() {
     headline = 'The assistant answered your question. No email was sent, and none was needed.';
   }
 
+  // Plain-language account for the audience: attack goal, outcome, which layer, task done?
+  const summary = buildSummary(r, added, escaped, delivered, asked, isAttack, v);
+
   // A CONFIRM went out after a simulated approval: say so, since a real
   // assistant would have stopped to ask.
   const approved = (r.gate || []).filter(g => g.approval && g.approval.simulated).flatMap(g => g.approval.recipients || []);
@@ -617,7 +675,8 @@ function renderResult() {
         return `<div class="line ${bad ? 'added' : ''}">
           <span class="mark">${bad ? '✗' : '✓'}</span>
           <span class="addr">${escHtml(d.addr)}</span>
-          ${bad ? `<span style="font-size:10.5px;color:var(--red);font-weight:700;margin-left:auto">NOT YOURS${left.includes(d.addr) ? ' · OUTSIDE' : ''}</span>` : ''}
+          <span style="font-size:10px;color:var(--text-dim);margin-left:6px;letter-spacing:.04em">${d.field.toUpperCase()}</span>
+          ${bad ? `<span style="font-size:10.5px;color:var(--red);font-weight:700;margin-left:auto">NOT ASKED FOR${left.includes(d.addr) ? ' · OUTSIDE THE COMPANY' : ''}</span>` : ''}
         </div>`;
       }).join('')
     : `<div class="line"><span class="mark">✓</span><span class="addr" style="font-family:var(--font-ui)">no email sent</span></div>`;
@@ -666,6 +725,7 @@ function renderResult() {
         <span>
           <span class="v-state">${escHtml(state)}</span>
           <div class="v-headline">${headline}</div>
+          ${summary}
         </span>
       </div>
       <div class="cols">

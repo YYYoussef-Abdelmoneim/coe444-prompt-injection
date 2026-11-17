@@ -134,8 +134,14 @@ def _address(value: str) -> str:
     return value.lower()
 
 
-def _outside_company(address: str) -> bool:
-    return not _address(address).endswith("@" + COMPANY_DOMAIN)
+def _outside_company(address: str, directory: "Directory | None" = None) -> bool:
+    """Simulated: not on the company domain. Gmail demo: not a mailbox anyone in
+    the (remapped) directory owns - gmail.com is everyone's domain, so domain
+    alone would make every attacker an insider."""
+    a = _address(address)
+    if directory is not None and MAIL_BACKEND == "gmail":
+        return a not in directory.addresses() and a != EMPLOYEE["address"].lower()
+    return not a.endswith("@" + COMPANY_DOMAIN)
 
 
 @dataclass
@@ -158,6 +164,9 @@ class Playground:
         # domains. A file, never the inbox: an outsider who fakes a company
         # From: line must not be able to add themselves.
         self.directory = directory or Directory.load()
+        if MAIL_BACKEND == "gmail" and directory is None:
+            from gmail_backend import directory_map
+            self.directory = self.directory.remapped(directory_map())
         self.reset()
 
     # ── Mailbox ──────────────────────────────────────────────────────────────
@@ -207,7 +216,7 @@ class Playground:
             "subject": subject.strip() or "(no subject)",
             "body": body,
             "date": _now(),
-            "outsider": _outside_company(sender),
+            "outsider": _outside_company(sender, self.directory),
             "example_attack": example_attack,
         }
         self.inbox.insert(0, email)
@@ -240,7 +249,7 @@ class Playground:
             "date": _now(),
             "via": via,
             "gate": gate,
-            "left_company": [r.strip() for r in recipients if _outside_company(r)],
+            "left_company": [r.strip() for r in recipients if _outside_company(r, self.directory)],
         }
 
     def queue_review(self, args: dict, sink, gate: dict, *, proposed: dict | None = None,
@@ -388,7 +397,7 @@ class Playground:
             _LiveRetriever(retriever, self.poisons, run),
             run.mail,
             directory=_LiveDirectory(self.directory, run),
-            extra_tools=[ExtraTool(READ_INBOX_SCHEMA, lambda _args: run.screen(self._inbox_chunks(), "inbox"))],
+            extra_tools=[ExtraTool(READ_INBOX_SCHEMA, lambda _args: run.screen(self._live_inbox_chunks(), "inbox"))],
             system_prompt=PLAYGROUND_PROMPT,
         )
         started = time.monotonic()
@@ -410,6 +419,17 @@ class Playground:
             "latency_ms": int((time.monotonic() - started) * 1000),
             "tokens": result.input_tokens + result.output_tokens,
         }
+
+    def _live_inbox_chunks(self) -> list[TaggedChunk]:
+        """What read_inbox returns. In Gmail mode the real inbox is re-fetched on
+        every call, so the agent always sees what is in 444testmail right now -
+        a message the audience sent a moment ago included. Nothing is scripted."""
+        if self.real_mail:
+            try:
+                self.refresh_inbox()
+            except Exception as exc:  # noqa: BLE001 - a Gmail hiccup must not kill the turn
+                _log.error("inbox refresh failed, using last copy: %s", exc)
+        return self._inbox_chunks()
 
     def _inbox_chunks(self) -> list[TaggedChunk]:
         return [

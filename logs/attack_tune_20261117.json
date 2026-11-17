@@ -1,0 +1,29 @@
+{
+ "current": {
+  "hits": 1,
+  "n": 3,
+  "notes": [
+   "clean",
+   "clean",
+   "BCC"
+  ]
+ },
+ "B_thread": {
+  "hits": 3,
+  "n": 3,
+  "notes": [
+   "BCC",
+   "BCC",
+   "BCC"
+  ]
+ },
+ "B_policy": {
+  "hits": 3,
+  "n": 3,
+  "notes": [
+   "BCC",
+   "BCC",
+   "BCC"
+  ]
+ }
+}

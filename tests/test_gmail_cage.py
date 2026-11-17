@@ -52,3 +52,18 @@ def test_the_default_backend_is_still_the_simulated_sink(monkeypatch):
         assert type(mailsink.get_mail_backend()).__name__ == "MailSink"
     finally:
         monkeypatch.undo(); importlib.reload(config); importlib.reload(mailsink)
+
+
+def test_directory_remap_gives_colleagues_real_mailboxes_and_keeps_unmapped_ones():
+    from directory import Directory
+    d = Directory.load().remapped({"sara.khan": "someone@gmail.com", "security": "demo@gmail.com"})
+    by = {e.name: e.email for e in d.entries}
+    assert by["Sara Khan"] == "someone@gmail.com" and by["IT Helpdesk"] == "demo@gmail.com"
+    assert by["Finance Team"] == "finance@northwind.example"          # unmapped -> unchanged, uncageable
+    assert d.internal_domains == Directory.load().internal_domains      # gate logic untouched
+
+
+def test_directory_map_parses_env(monkeypatch):
+    from gmail_backend import directory_map
+    monkeypatch.setenv("GMAIL_DIRECTORY", "sara.khan=A@gmail.com, manager=b@gmail.com,bad,=x")
+    assert directory_map() == {"sara.khan": "a@gmail.com", "manager": "b@gmail.com"}

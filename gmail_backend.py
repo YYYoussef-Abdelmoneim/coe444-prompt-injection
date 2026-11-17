@@ -43,6 +43,20 @@ class RecipientNotAllowed(PermissionError):
     """Raised for ANY recipient outside the allow-list. The send does not happen."""
 
 
+def directory_map() -> dict[str, str]:
+    """GMAIL_DIRECTORY = "sara.khan=someone@gmail.com,manager=other@gmail.com" -
+    which real mailbox plays each Northwind colleague in the demo. The key is
+    the local part (or role) of the fictional address. Demo only."""
+    raw = os.getenv("GMAIL_DIRECTORY", "")
+    out: dict[str, str] = {}
+    for pair in raw.split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            if k.strip() and v.strip():
+                out[k.strip().lower()] = v.strip().lower()
+    return out
+
+
 def allowed_recipients() -> frozenset[str]:
     raw = os.getenv("GMAIL_ALLOWED_RECIPIENTS", "")
     return frozenset(a.strip().lower() for a in raw.split(",") if a.strip())
