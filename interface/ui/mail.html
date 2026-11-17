@@ -173,8 +173,9 @@
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.sum{margin-top:10px;display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px}
-.sum-k{color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-size:10.5px;padding-top:3px}
+.sum{margin-top:12px;display:flex;flex-direction:column;gap:6px;font-size:13px;max-width:78ch}
+.sum-row{display:grid;grid-template-columns:120px 1fr;gap:0 14px;align-items:start;line-height:1.45}
+.sum-k{color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-size:10.5px;padding-top:3px;white-space:nowrap}
 .sum-v code{font-size:12px}
 .sum-v.bad{color:var(--red)} .sum-v.good{color:var(--green)} .sum-v.warn{color:var(--yellow)}
 </style>
