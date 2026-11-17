@@ -104,3 +104,47 @@ assistant does with it."
 - **Hamza** — gate = "where did these bytes come from?"; run the demo; say "nothing leaves until she approves".
 - **Kholoud** — read the chart left to right; say "not refuted, not demonstrated"; PI-105 story.
 - **Belal** — three lessons; "we found bugs in our own scorer and reported both numbers"; close.
+
+---
+
+## Q13. "Doesn't Gmail / a company domain already block outside senders?"
+
+No — and if it did, business would stop. Email is open by design: customers, suppliers, partners and
+applicants all write to employees from outside, every day. What Gmail filters is **spam and phishing
+aimed at humans**: bulk patterns, bad reputations, malicious links and attachments. Our attack email has
+none of those — plain text, polite, individually sent, no link — so it passes every filter, because to a
+spam filter it *is* legitimate mail. It is dangerous only to a **machine reader**, and no mail filter
+checks for that. Workspace does label it "External" (so does our Mailbox, red OUTSIDE THE COMPANY); that
+helps a human be cautious and does nothing for the model, which reads the body as text regardless.
+And the inbox is only the cheapest door: block it and the attacker edits a shared document, sends a PDF
+a partner forwards, or compromises one junior account that *is* inside the domain. That is why the
+defenses sit on what the agent reads and what it sends, not on where the mail came from.
+
+One sentence: *"Gmail's filters protect a human reader from spam and phishing. Our email is neither.
+The danger exists only for a machine reader, and no mail filter today checks for that — that's the gap."*
+
+## Q14. EchoLeak — what exactly happened, and how is it like ours?
+
+CVE-2025-32711, CVSS 9.3, found by Aim Security in Microsoft 365 Copilot, patched server-side in 2025.
+Four steps: (1) attacker sends one business-looking email, no link, never mentions AI, with
+instructions worded as if to the human reader; (2) it sits unopened in the inbox; (3) later the
+employee asks Copilot an ordinary question and Copilot's retrieval pulls that email in as context;
+(4) Copilot obeys — writes sensitive data from the user's files into an image link in its answer; the
+browser loads the image automatically and the data reaches the attacker. Zero clicks.
+
+Microsoft HAD three defenses and the attack went past each: the XPIA injection classifier (email was
+prose addressed to a human), link redaction (reference-style markdown links were not stripped), and the
+image-domain allow-list (routed through a legitimate Teams preview URL). Say this precisely — not
+"Microsoft had no defenses".
+
+Parallels: their classifier was beaten by human-sounding prose → our rubric judges what the text would
+make an assistant DO, and when that misses (PI-105 at 0.05) the gate catches it by provenance. Their
+link filter missed a format → our gate strips any link whose host does not trace to the user or the
+company, regardless of format. Their layers failed one at a time → ours are independent and the attacker
+must beat both. Honest limit: we reproduced the shape (email → agent reads → agent acts for the
+attacker), not the exact chain — EchoLeak leaked data via a link; our demo attacker gets a BCC. PI-241
+(URL exfiltration) is the closer analogue; gate-v3 was built for it.
+
+Sources: Aim Security EchoLeak write-up (2025); Microsoft Tech Community, "Reliability starts with
+separating instruction from content"; BleepingComputer, "Zero-click AI data leak flaw uncovered in
+Microsoft 365 Copilot"; arXiv 2509.10540.
