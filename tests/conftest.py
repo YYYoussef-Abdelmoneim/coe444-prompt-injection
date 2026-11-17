@@ -8,9 +8,16 @@ from pathlib import Path
 
 import pytest
 
-# The suite never touches real mail, whatever the developer's .env says
-# (the Gmail demo backend is opt-in for the Mailbox UI only).
+# The suite always sees the frozen research stack, whatever the developer's .env
+# says. The Gmail backend, the raised turn cap and the demo document corpus
+# (with the fictional compensation sheet) exist for the Mailbox demo only.
+# load_dotenv() in config.py does not override variables already set, so
+# setting them here pins the suite to the research values.
+_ROOT = Path(__file__).resolve().parent.parent
 os.environ["MAIL_BACKEND"] = "simulated"
+os.environ["AGENT_MAX_TURNS"] = "0"
+os.environ["DOCUMENTS_DIR"] = str(_ROOT / "rag" / "documents")
+os.environ["FAISS_INDEX_PATH"] = str(_ROOT / ".data" / "faiss_index")
 
 from schema import Origin, TaggedChunk
 

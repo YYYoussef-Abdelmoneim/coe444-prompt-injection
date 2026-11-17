@@ -120,6 +120,11 @@
   .said { margin-top: 9px; padding: 12px 15px; border-radius: 12px 12px 12px 4px; background: var(--bg3); border: 1px solid var(--border); font-family: var(--font-ui); font-size: 13.5px; line-height: 1.55; color: var(--text); white-space: pre-wrap; max-width: 72ch; }
   .said b { color: var(--text); } .said table { border-collapse: collapse; margin: 6px 0; font-size: 12.5px; } .said td, .said th { border: 1px solid var(--border); padding: 3px 8px; text-align: left; }
   .bubble-you { margin: 0 0 8px auto; padding: 10px 14px; border-radius: 12px 12px 4px 12px; background: rgba(0,200,240,.12); border: 1px solid rgba(0,200,240,.35); font-size: 13.5px; max-width: 72ch; width: fit-content; }
+  .thread { display: flex; flex-direction: column; gap: 8px; }
+  .thread .said { margin-top: 0; }
+  .reply-row { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
+  .reply-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font-family: var(--font-ui); font-size: 13px; }
+  .reply-row input:focus { outline: none; border-color: var(--cyan); }
   .chat-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); margin-bottom: 6px; }
   /* review card */
   .review { margin-top: 14px; border-radius: 12px; border: 1px solid var(--border); border-left: 5px solid var(--yellow); background: var(--bg2); overflow: hidden; }
@@ -261,6 +266,18 @@ function escHtml(s) {
 // "xhr@x" and put a false accusation on screen.
 const ADDR_RE  = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g;
 const ADDR_ONE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
+function threadHtml() {
+  const turns = CONVO.map(t => t.role === 'user'
+    ? `<div class="bubble-you">${escHtml(t.content)}</div>`
+    : `<div class="said">${mdLite(t.content)}</div>`).join('');
+  return `<div class="thread">${turns}
+    <form class="reply-row" onsubmit="event.preventDefault(); const v=this.querySelector('input').value.trim(); if(v){this.querySelector('input').value=''; run(v);}">
+      <input type="text" placeholder="Reply to the assistant… (e.g. “yes, send it”)" autocomplete="off">
+      <button type="submit" class="btn btn-approve" style="padding:8px 14px">Send</button>
+      <button type="button" class="btn btn-reject" style="padding:8px 12px" onclick="resetAll()">New conversation</button>
+    </form></div>`;
+}
+
 function mdLite(text) {
   // **bold**, *em*, bullet lines, and simple | tables | → HTML. Escapes first, so nothing in the text is live.
   let t = escHtml(String(text || ''));
@@ -430,13 +447,15 @@ async function applyPlanting() {
 async function resetAll() {
   await fetch('/api/mailbox/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   document.getElementById('result').innerHTML = '';
-  LAST_RUN = null;
+  LAST_RUN = null; CONVO = [];
   await applyPlanting();
 }
 
 // ── Step 3 ──────────────────────────────────────────────────────────────────
-async function run() {
-  const task = document.getElementById('task').value.trim();
+let CONVO = [];   // [{role:'user'|'assistant', content}] — the running thread shown in the result panel
+
+async function run(fromThread) {
+  const task = (typeof fromThread === 'string' ? fromThread : document.getElementById('task').value).trim();
   if (!task) return;
   LAST_TASK = task;
   const btn = document.getElementById('run-btn');
@@ -449,7 +468,7 @@ async function run() {
     const r = await fetch('/api/assistant', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: task, detection: DETECTION_ON, prevention: PREVENTION_ON,
-                            detection_mode: DETECTION_MODE,
+                            detection_mode: DETECTION_MODE, history: CONVO,
                             payload_id: CURRENT.kind === 'attack' ? CURRENT.id : '' }),
     });
     const data = await r.json();
@@ -458,6 +477,8 @@ async function run() {
       document.getElementById('result').innerHTML = `<div class="err">${escHtml(data.error || ('HTTP ' + r.status))}</div>`;
     } else {
       LAST_RUN = data;
+      CONVO.push({ role: 'user', content: task });
+      if (data.reply) CONVO.push({ role: 'assistant', content: data.reply });
       MAILBOX = await getMailbox();
       renderResult();
     }
@@ -751,14 +772,11 @@ function renderResult() {
       <div class="why-line">${line}</div>
       ${quote ? `<div class="planted-text">${escHtml(String(quote).trim())}</div>` : ''}
       <div class="why-title" style="margin-top:14px">The conversation</div>
-      <div class="bubble-you">${escHtml(LAST_TASK)}</div>
-      <div class="said">${mdLite(r.reply || '')}</div>
+      ${threadHtml()}
       ${mentioned ? '' : `<div class="gotcha">It never mentioned ${escHtml(a)}. From that reply alone your task simply succeeded — which is exactly what makes this dangerous.</div>`}
     </div>`;
   } else if (r.reply) {
-    why = `<div class="why"><div class="why-title">The conversation</div>
-      <div class="bubble-you">${escHtml(LAST_TASK)}</div>
-      <div class="said">${mdLite(r.reply)}</div></div>`;
+    why = `<div class="why"><div class="why-title">The conversation</div>${threadHtml()}</div>`;
   }
 
   const df = r.defenses || {};

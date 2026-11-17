@@ -776,6 +776,7 @@ def api_assistant():
             detection_on=bool(data.get("detection")),
             prevention_on=bool(data.get("prevention")),
             detection_mode="remove_span" if data.get("detection_mode") == "remove_span" else "withhold",
+            history=[h for h in (data.get("history") or []) if isinstance(h, dict) and h.get("role") in ("user", "assistant")][-12:],
         )
     except Exception as e:
         traceback.print_exc()

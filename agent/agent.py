@@ -30,6 +30,10 @@ _log = logging.getLogger(__name__)
 # recipient by role (search, lookup, send, reply), and a two-document question
 # (BN-060) ran out of turns at 4 with no defense running.
 MAX_TURNS = 6
+# The Mailbox demo may raise the cap (AGENT_MAX_TURNS in .env); the evaluation
+# never sets it, so every logged run keeps the frozen 6.
+import os as _os
+_DEMO_MAX_TURNS = int(_os.getenv("AGENT_MAX_TURNS", "0") or 0)
 
 
 @dataclass
@@ -101,10 +105,20 @@ class Agent:
         inject: str | None = None,
         inject_into: str | None = None,
         inject_meta: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
+        max_turns: int | None = None,
     ) -> AgentRun:
+        """`history` (Mailbox only): prior user/assistant text turns of the same
+        conversation, so the person can answer a clarifying question. Tool
+        results are not carried over - each run re-reads the world. The
+        evaluation never passes it."""
         started = time.monotonic()
         out = AgentRun(user_prompt=user_prompt)
-        messages: list[dict[str, Any]] = [{"role": "user", "content": user_prompt}]
+        messages: list[dict[str, Any]] = [
+            *[{"role": h["role"], "content": str(h["content"])} for h in (history or []) if h.get("content")],
+            {"role": "user", "content": user_prompt},
+        ]
+        turn_cap = max_turns or _DEMO_MAX_TURNS or MAX_TURNS
 
         # agent-v3: an attack aimed at the inbox is planted as one email before
         # the run starts - the attacker sent it; it is waiting to be read. The
@@ -121,7 +135,7 @@ class Agent:
             inject = None
 
         try:
-            for _ in range(MAX_TURNS):
+            for _ in range(turn_cap):
                 out.turns += 1
                 resp = self.provider.generate(messages, self.tool_schemas, self.system_prompt)
                 out.input_tokens += resp.input_tokens

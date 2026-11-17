@@ -390,6 +390,7 @@ class Playground:
         detection_on: bool,
         prevention_on: bool,
         detection_mode: str = "withhold",
+        history: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         run = _LiveRun(self, detector, gate, detection_on, prevention_on, message, detection_mode)
         agent = Agent(
@@ -401,7 +402,7 @@ class Playground:
             system_prompt=PLAYGROUND_PROMPT,
         )
         started = time.monotonic()
-        result = agent.run(message)
+        result = agent.run(message, history=history)
         new_sent = run.flush_sent()
         return {
             "reply": result.final_text,

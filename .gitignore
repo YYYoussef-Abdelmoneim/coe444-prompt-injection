@@ -73,3 +73,5 @@ scripts/activate.sh
 .data/llmail_inject/
 docs/final/render/
 .secrets/
+rag/documents_demo/
+.faiss_demo/
