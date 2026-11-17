@@ -115,9 +115,9 @@ Close with the question: stop the attacker AND finish the task — a defense tha
 
 # ───────────── 3 · Solution ─────────────
 s = slides[2]
-content_frame(s, f"{SPEAKERS[1]} & {SPEAKERS[2]}", "Four layers, in the order the attacker's text travels", [
-    "1. Sanitize — make hidden text visible.   2. Detector — a second model cuts the instruction; the task goes on.",
-    "3. Gate — every recipient and link must trace to what you typed or the directory returned.   4. Human review — with a security notice if you override.",
+content_frame(s, f"{SPEAKERS[1]} & {SPEAKERS[2]}", "Two defenses, four stages — in the order the attacker's text travels", [
+    "Detection = 1. Sanitize (make hidden text visible) + 2. Detector (a second model cuts the instruction; the task goes on).",
+    "Prevention = 3. Gate (every recipient and link must trace to what you typed or the directory returned) + 4. Human review (security notice on override).",
     "Nothing is trained. One frozen threshold. The agent's own prompt is never hardened.",
 ])
 t1 = shape(s, "Text 1"); t1.left = Inches(7.0); t1.width = Inches(5.55); set_text(t1, f"Presented by: {SPEAKERS[1]} & {SPEAKERS[2]}", size=14, align=PP_ALIGN.RIGHT)
