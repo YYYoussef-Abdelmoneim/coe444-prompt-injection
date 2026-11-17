@@ -173,6 +173,11 @@
     </div>
     <select id="scenario"></select>
     <div id="setup"></div>
+    <div id="mail-tools" style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <span id="mail-mode" class="chip">Simulated mail</span>
+      <button class="toggle-btn" id="refresh-btn" style="border:1px solid #e09f3e;color:#e09f3e;display:none">Fetch real inbox</button>
+      <button class="toggle-btn" data-reset="1" style="margin-left:auto;border:1px solid var(--border)">Reset mailbox</button>
+    </div>
   </div>
 
   <div class="step">
@@ -285,6 +290,21 @@ async function init() {
     fetch('/api/benign').then(r => r.json()).catch(() => []),
   ]);
   MAILBOX = mb || { documents: [], inbox: [], sent: [] };
+  if (MAILBOX.real_mail) {
+    const b = document.getElementById('refresh-btn'); b.style.display = '';
+    b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')';
+    const banner = document.createElement('div');
+    banner.style.cssText = 'margin:0 0 10px;padding:8px 12px;border:1px solid #e09f3e;border-radius:6px;color:#e09f3e;font-size:13px';
+    banner.textContent = 'REAL GMAIL DEMO — sends go through the Gmail API. Only allow-listed recipients can ever receive mail; anything else is refused.';
+    document.body.insertBefore(banner, document.body.firstChild);
+    document.getElementById('mail-mode').textContent = 'REAL GMAIL: ' + (MAILBOX.real_address || '');
+    document.getElementById('mail-mode').style.color = '#e09f3e';
+    b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = 'Fetching…';
+      try { const r = await fetch('/api/mailbox/refresh', {method:'POST'}); const d = await r.json(); if (!r.ok) alert(d.error); }
+      finally { MAILBOX = await getMailbox(); b.disabled = false; b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')'; if (LAST_RUN) renderResult(); }
+    });
+  }
 
   // dev split only — the test payloads stay unopened until the final run.
   const benign  = (bns || []).filter(b => b.split === 'dev').slice(0, 3);
@@ -376,19 +396,6 @@ async function applyPlanting() {
     });
   }
   MAILBOX = await getMailbox();
-  if (MAILBOX.real_mail) {
-    const b = document.getElementById('refresh-btn'); b.style.display = '';
-    b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')';
-    const banner = document.createElement('div');
-    banner.style.cssText = 'margin:0 0 10px;padding:8px 12px;border:1px solid #e09f3e;border-radius:6px;color:#e09f3e;font-size:13px';
-    banner.textContent = 'REAL GMAIL DEMO — sends go through the Gmail API. Only allow-listed recipients can ever receive mail; anything else is refused.';
-    document.body.insertBefore(banner, document.body.firstChild);
-    b.addEventListener('click', async () => {
-      b.disabled = true; b.textContent = 'Fetching…';
-      try { const r = await fetch('/api/mailbox/refresh', {method:'POST'}); const d = await r.json(); if (!r.ok) alert(d.error); }
-      finally { MAILBOX = await getMailbox(); b.disabled = false; b.textContent = 'Fetch real inbox (' + (MAILBOX.real_address || 'Gmail') + ')'; if (typeof renderMailbox === 'function') renderMailbox(); }
-    });
-  }
 }
 
 async function resetAll() {
@@ -670,8 +677,6 @@ function renderResult() {
         ${chip('Detection', !!(df.detection || {}).on, !!(df.detection || {}).implemented)}
         ${chip('Prevention', !!(df.prevention || {}).on, !!(df.prevention || {}).implemented)}
         <span class="chip">${r.tokens || 0} tokens</span>
-        <button class="toggle-btn" id="refresh-btn" style="margin-left:auto;border:1px solid #e09f3e;color:#e09f3e;display:none">Fetch real inbox</button>
-        <button class="toggle-btn" data-reset="1" style="border:1px solid var(--border)">Reset mailbox</button>
       </div>
     </div>
     ${renderMore(r)}`;

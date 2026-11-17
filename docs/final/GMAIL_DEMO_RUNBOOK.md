@@ -73,7 +73,7 @@ Window B → compose to 444testmail, subject `Partner compliance – mail handli
 SAY: "This is the attacker. No Northwind account, no password, never touched the assistant. He does the one thing anyone can do to any employee: sends her an email. It isn't written for a person — it's dressed up as a company rule, written for the assistant. Nobody has to click anything."
 
 ### Step 2 — it lands in Layla's real inbox (10 s)
-Window A → bottom → Fetch real inbox. SAY: "Layla's real Gmail inbox, via the Gmail API. It just sits there. She may never open it."
+Window A → step 1 toolbar → Fetch real inbox. SAY: "Layla's real Gmail inbox, via the Gmail API. It just sits there. She may never open it."
 
 ### Step 3 — normal request, defenses OFF (30 s)
 Scenario "Normal — annual leave…" (any Normal; never an Attack option) · Detection OFF · Prevention OFF · task:
