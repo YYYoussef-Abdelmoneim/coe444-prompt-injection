@@ -507,3 +507,20 @@ accepting the residual)*
   iterate on (EchoLeak's "RAG spraying"). Stage line: attackers tune their email to the victim's work.
 - Q13/Q14 added to DEMO_AND_QA.md (why Gmail does not block this; EchoLeak precisely, with the three
   bypassed Microsoft defenses named correctly).
+
+### 37. Mailbox result area redesign (user review of the live demo screens)
+- **Trigger (user):** the undefended run showed "NORMAL — nothing went wrong" for a reply to Sara even
+  though the task named Sara (the UI only counted typed addresses); the review card looked like raw
+  text (visible `**markdown**`, link-styled Approve/Reject); the whole result should read like talking
+  to an agent while still exposing what ran underneath.
+- **Changes.** "You asked for mail to" now resolves colleagues named in the task via the directory
+  (`/api/mailbox` → `people`), so "Reply to Sara" shows Sara's address as asked-for, and only a
+  recipient the user did not ask for is an alarm. Verdict state is THE ATTACK WORKED whenever an extra
+  recipient traces to text the agent read (planted or real inbox), and the headline names the field
+  ("as BCC"); the good state reads SAFE. The conversation is shown as two bubbles (you / assistant) with
+  light markdown rendering. The review card is an email: white card with To/CC/BCC/Subject header,
+  rendered body, a yellow "Removed by the defenses before you see this" block, the original proposal
+  behind a disclosure, and real buttons — green Approve and send, outlined Reject, amber override when
+  applicable. The read/tool/gate detail stays in the collapsible "Everything the assistant read and did".
+- Verified in the browser against live Gmail: defended → review card renders cleanly; undefended →
+  THE ATTACK WORKED, attacker listed as BCC · NOT ASKED FOR · OUTSIDE THE COMPANY, Sara as TO ✓.

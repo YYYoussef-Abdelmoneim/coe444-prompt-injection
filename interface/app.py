@@ -614,6 +614,8 @@ def api_mailbox():
             # it, replying to Sara (whose address appears only inside her own
             # email) looks identical to an injected recipient.
             "contacts": sorted(box.directory.addresses()),
+            "people": [{"email": e.email, "names": [e.name.lower(), e.name.split()[0].lower(), *e.aliases]}
+                       for e in box.directory.entries if e.email != EMPLOYEE["address"]],
             "defenses": _defense_status(),
             "models": {
                 "agent": f"{AGENT_MODEL} on {AGENT_PROVIDER}",
