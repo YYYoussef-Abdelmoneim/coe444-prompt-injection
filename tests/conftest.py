@@ -16,6 +16,8 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 os.environ["MAIL_BACKEND"] = "simulated"
 os.environ["AGENT_MAX_TURNS"] = "0"
+os.environ["AGENT_MAX_TOKENS"] = "2048"
+os.environ["DETECTOR_MAX_TOKENS"] = "1024"
 os.environ["DOCUMENTS_DIR"] = str(_ROOT / "rag" / "documents")
 os.environ["FAISS_INDEX_PATH"] = str(_ROOT / ".data" / "faiss_index")
 
