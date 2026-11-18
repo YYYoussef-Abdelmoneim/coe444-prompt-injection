@@ -57,3 +57,11 @@
 - "we trained a model" → prompted, one frozen number
 - "we achieved <5 %" → 0 of 41, upper bound 23 %, not refuted
 - "Microsoft had no defenses" → had three, bypassed
+
+## "Why that model?" (METHODOLOGY §4, §6.4)
+- Proposal's Llama 3.1-8B: no local hardware (5 GB / 6 GB), retired on Groq (404). Deviation stated §1.2.
+- Agent gpt-oss-20b: the candidate that actually falls for attacks — 7/10 undefended. Qwen-27b fell for 0/10 (refused, told the user) → a table of zeros proves nothing. allam-7b: no tool calling. Cheap tier = realistic deployment.
+- Detector gpt-oss-120b: bigger (~117B vs 21B), DIFFERENT model from the agent (shared failure modes → optimistic recall), affordable ×3.
+- Open-weight: reproducible, host-independent — proved it: Cerebras → Groq → Nous, same weights, consistent verdicts.
+- Limitation 6: same family, forced not chosen. Mitigation: action rubric, model-free gate, Microsoft black-box check 5/50.
+- Model choice moves A (undefended), not D in principle; dev D stayed 0/10 across host moves.
